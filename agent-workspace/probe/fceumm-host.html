@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>fceumm 宿主原型</title>
+<style>
+  body { margin: 0; background: #14100e; color: #d8cdbd; font: 14px/1.5 system-ui, sans-serif; }
+  #screen { width: 512px; height: 480px; image-rendering: pixelated; display: block; background: #000; }
+  #log { white-space: pre-wrap; padding: 8px 12px; max-width: 620px; }
+</style>
+</head>
+<body>
+<canvas id="screen" width="256" height="240"></canvas>
+<div id="log">启动中…</div>
+<script type="module">
+import { LibretroHost, BUTTON } from '/nes/libretro-host.js';
+
+const params = new URLSearchParams(location.search);
+const log = document.getElementById('log');
+const host = new LibretroHost(document.getElementById('screen'), {
+  coreUrl: params.get('core') || '/core/fceumm_libretro.mjs',
+  onStatus: (msg) => { log.textContent = String(msg); },
+  onCrash: (msg) => { probe.error = '崩溃: ' + msg; },
+});
+
+const probe = window.__host = {
+  ready: false, error: '', log: [],
+  host, // 调试脚本要看宿主内部（上下文状态、worklet port），产品接口不需要这一项
+  async boot() {
+    try {
+      const res = await fetch(params.get('rom'));
+      if (!res.ok) throw new Error(`ROM 取不到：HTTP ${res.status}`);
+      const ok = await host.loadROM(new Uint8Array(await res.arrayBuffer()), 'probe');
+      if (!ok) throw new Error('retro_load_game 返回 false');
+      this.ready = true;
+    } catch (e) {
+      this.error = e.message;
+    }
+  },
+  stats() {
+    return {
+      frames: host.frames,
+      fps: host.avInfo.fps,
+      coreRate: host.srcRate,
+      ctxRate: host.audioCtx ? host.audioCtx.sampleRate : null,
+      audioSent: host.audioSent,
+      audioDepth: host.audioStats.depth,
+      audioUnderrun: host.audioStats.underrun,
+      audioDropped: host.audioStats.dropped,
+      speed: host._speed,
+      pixelFormat: host.pixelFormat,
+      status: log.textContent,
+    };
+  },
+  shot() {
+    const c = document.getElementById('screen');
+    return Array.from(host.imageData ? host.imageData.data : new Uint8ClampedArray(0));
+  },
+  press(id) { host.buttonDown(0, id); },
+  release(id) { host.buttonUp(0, id); },
+  saveState() { const s = host.serialize(); return s ? Array.from(s) : null; },
+  loadState(arr) { host.unserialize(new Uint8Array(arr)); return true; },
+  sram() { const s = host.saveRam(); return s ? s.length : 0; },
+  pause() { host.pause(); },
+  resume() { host.start(); },
+  step(n) { host.step(n || 1); },
+  reset() { host.reset(); },
+};
+window.BUTTON = BUTTON;
+probe.boot();
+</script>
+</body>
+</html>

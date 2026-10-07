@@ -1,0 +1,147 @@
+---
+import '../styles/global.css';
+---
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>NES Console - 在线玩 NES 游戏</title>
+    <link rel="icon" type="image/svg+xml" href="/nes-console/favicon.svg" />
+  </head>
+  <body>
+    <!--
+      布局说明（详见 global.css）：
+      .stage 铺满整个视口，.screen 在里面取「能放下的最大 4:3 矩形」。
+      因为画面是 4:3 而屏幕比例不同，画面之外必然有剩余空间：宽屏时在左右，竖屏时在下方。
+      那里只留给触摸手柄和摆放模式提示条，其余界面全部在屏幕内 ——
+      系统菜单（.sys-ui）、菜单按钮、一次性提示都在 .screen 里。
+
+      .screen 内部是「游戏机的屏幕」：canvas 是画面，.sys-ui（由 JS 插入）
+      是屏幕内的系统界面（游戏列表、设置、存档、操作说明、关于）。所有操作都能在屏幕内完成。
+    -->
+    <div class="stage">
+      <!-- 游戏画面：canvas 的实际渲染分辨率保持 256x240 -->
+      <div class="screen">
+        <canvas
+          id="nes-canvas"
+          width="256"
+          height="240"
+          class="block w-full h-full image-rendering-pixelated"
+        ></canvas>
+        <!-- CRT 滤镜层 -->
+        <div id="crt-filter" class="absolute inset-0 pointer-events-none crt-filter"></div>
+        <!-- 系统界面（.sys-ui）由 screen-ui.js 挂载到这里 -->
+        <!--
+          右上角这一排两颗常驻按钮：左边「全屏」、右边「菜单」。都在 .screen 内、
+          不在 .sys-ui 内，因为菜单关闭时 .sys-ui 会 hidden，放进去按钮会跟着消失。
+          菜单按钮保留 data-action="MENU"，由 input-manager 自动绑定；
+          全屏按钮**不能**带 data-action —— app.js 里那句
+          document.querySelectorAll('[data-action]') 会把它当成手柄按键绑掉，
+          它只走自己的 click（见 app.js 的「全屏」一节）。
+        -->
+        <button class="touch-btn touch-fs" id="fullscreen-btn" type="button" aria-label="全屏">
+          <!--
+            图标取自 Feather Icons 的 maximize / minimize 一对（MIT）：四角朝外=进全屏，
+            四角朝内=退全屏，由 app.js 在 fullscreenchange 时换。
+            描边风格（24 格 viewBox、stroke=currentColor、线宽 2）和菜单里的分类图标同一套。
+          -->
+          <svg class="fs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path class="fs-icon-in" d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+            <path class="fs-icon-out" d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+          </svg>
+        </button>
+        <button class="touch-btn touch-menu" data-action="MENU" aria-label="菜单">菜单</button>
+        <!-- 未加载 ROM 时的提示 -->
+        <div id="canvas-overlay" class="absolute inset-0 flex items-center justify-center bg-black/70">
+          <p class="text-gray-300 text-sm text-center px-4">按 Esc 或点右上角「菜单」打开菜单</p>
+        </div>
+        <!--
+          一次性提示（toast）：状态、报错、"已保存到 X" 这些，显示完自动消失。
+          挂在 .screen 上（不是 .sys-ui 里），因为菜单关着时也要能弹出来；
+          菜单开着时它压在菜单之上显示，位置在画面顶部居中（见 global.css）。
+        -->
+        <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+      </div>
+
+      <!--
+        ROM 文件选择：菜单里「加入游戏 / 载入其他 ROM」触发它，整页拖放也走同一条路。
+        放在 .screen 外面，它不是界面元素，只是个隐藏的系统对话框入口。
+      -->
+      <input type="file" id="file-input" accept=".nes" class="hidden" />
+
+      <!--
+        摆放模式提示条：只在「控制管理 → 自由摆放」期间出现。
+        虚拟手柄在 .screen 外面、系统菜单在 .screen 里面，摆位置时菜单必须关掉才拖得到，
+        所以这里给一个不依赖菜单的出口（完成）和反悔入口（恢复默认位置）。
+      -->
+      <div id="layout-editor" class="layout-editor" hidden>
+        <span class="layout-editor-tip">按住按键组拖到想要的位置，松手即保存</span>
+        <button class="layout-editor-btn" type="button" data-editor="reset">恢复默认位置</button>
+        <button class="layout-editor-btn layout-editor-btn-primary" type="button" data-editor="done">完成</button>
+      </div>
+
+      <!--
+        触摸手柄：电脑/平板在左右两侧下方，手机在下方。
+        按钮用 data-action 声明对应的「动作」（见 input-manager.js），
+        JS 按属性自动绑定，加按钮只改这里。
+      -->
+      <div id="touch-controls">
+        <!--
+          左手这块：十字键在上，SELECT/START 两条扁键在下。
+          系统键原来跟在动作键下面，挪到这边是为了左右配平 ——
+          右手只剩五颗一样大的圆键，左手多出一排细条，两边都不再是「一边挤一边空」。
+
+          十字键本身：四片「软拨片」，不是一个方向一个圆钮。
+          按在哪个扇区决定方向，按在两片中间那条缝就是斜向，中心是死区
+          （判定逻辑见 input-manager.js 的 attachTouchDpad）。
+          四个臂的 data-action 声明这个臂代表哪个方向，JS 按它们在页面上的实际位置算方位。
+        -->
+        <div class="touch-dpad-group">
+          <div class="touch-dpad" role="group" aria-label="方向键">
+            <span class="touch-dpad-hit"></span>
+            <span class="touch-dpad-arm touch-up" data-action="UP"></span>
+            <span class="touch-dpad-arm touch-left" data-action="LEFT"></span>
+            <span class="touch-dpad-arm touch-right" data-action="RIGHT"></span>
+            <span class="touch-dpad-arm touch-down" data-action="DOWN"></span>
+            <!-- 外形：一片形状定义一次（defs），四片靠 rotate 摆位，尖头都指向中心。
+                 每片是「方块 + 三角」拼成的短锥：外端一条扁弧接一段直的侧边，
+                 再直直收成一个圆头尖；接缝处全部倒圆，所以看着软，中间也没有分隔线。
+                 中心不画点：四片尖头之间那道空缝就是死区，按了没反应的地方是看得见的。
+                 取景框（viewBox）不取整块 100 单位，而是贴着拨片外缘内缩到 3.24 起、边长 93.52：
+                 拨片路径最外缘在 4.3 单位（顶部那条扁弧的贝塞尔中点），照 0 起取景画出来的十字
+                 会比格子小一圈，顶边就压不到右边五键簇的顶边。内缩量含半个描边，
+                 所以描边外缘正好落在格子边上。推导见 global.css 的 .dpad-blade。 -->
+            <svg class="touch-dpad-face" viewBox="3.24 3.24 93.52 93.52" aria-hidden="true" focusable="false">
+              <defs>
+                <path id="dpad-blade" d="M35 11.5Q35 5.5 40 4.9Q50 3.7 60 4.9Q65 5.5 65 11.5L65 25Q65 28 62.5 30.5L54.5 37.5Q50 40 45.5 37.5L37.5 30.5Q35 28 35 25Z" />
+              </defs>
+              <use class="dpad-blade dpad-blade-up" href="#dpad-blade" />
+              <use class="dpad-blade dpad-blade-right" href="#dpad-blade" transform="rotate(90 50 50)" />
+              <use class="dpad-blade dpad-blade-down" href="#dpad-blade" transform="rotate(180 50 50)" />
+              <use class="dpad-blade dpad-blade-left" href="#dpad-blade" transform="rotate(270 50 50)" />
+            </svg>
+          </div>
+          <button class="touch-btn touch-select" data-action="SELECT" aria-label="Select">SELECT</button>
+          <button class="touch-btn touch-start" data-action="START" aria-label="Start">START</button>
+        </div>
+        <!--
+          右手这块：上排 X/Y、中排 A/B、正中间一颗 AB（按住等于 A 和 B 一起按）。
+          五颗键一样大，所以这块是个正方形簇；DOM 顺序和视觉顺序一致，摆位见 global.css。
+        -->
+        <div class="touch-actions" role="group" aria-label="动作键">
+          <button class="touch-btn touch-x" data-action="X" aria-label="X">X</button>
+          <button class="touch-btn touch-y" data-action="Y" aria-label="Y">Y</button>
+          <button class="touch-btn touch-a" data-action="A" aria-label="A">A</button>
+          <button class="touch-btn touch-b" data-action="B" aria-label="B">B</button>
+          <button class="touch-btn touch-ab" data-action="A B" aria-label="A 和 B 一起按">AB</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      import '../lib/app.js';
+    </script>
+  </body>
+</html>

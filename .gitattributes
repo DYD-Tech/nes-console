@@ -1,0 +1,12 @@
+# 仓库内统一用 LF。不设这条的话，git 会在检出时按 core.autocrlf 改成 CRLF，
+# 下次 diff 就全是「只有行尾变了」的噪声（`git add` 时已经报过这批警告）。
+* text=auto eol=lf
+
+# 二进制别做行尾与文本处理
+*.wasm binary
+*.nes binary
+*.NES binary
+*.png binary
+*.jpg binary
+*.gz binary
+*.tgz binary

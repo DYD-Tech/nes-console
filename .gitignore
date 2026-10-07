@@ -1,0 +1,23 @@
+# 依赖与构建产物（npm run build / astro preview 会重新生成）
+node_modules/
+dist/
+.astro/
+
+# 卡带镜像：绝大多数是你本机的私有文件，不进仓库。
+# 唯一放行的那条例外是**随站发布**给访客试玩的演示卡带（放行规则见 doc/游戏库与存档.md「哪些卡带进仓库」）。
+# 写成 `public/rom/*` 而不是 `public/rom/` —— 排除目录本身会让下面的 ! 例外失效。
+public/rom/*
+!public/rom/金庸群侠传.nes
+
+# 内置游戏清单是上面那个目录的派生物（任何 dev/build 都会重写），不入库。
+# 更要紧的是：它按文件名列出镜像里的**每一**款，把没进仓库的卡带名字也带出去了。
+public/games.json
+
+# agent 自用的一次性产物：跑测试的日志与截图、探针输出。
+# agent-workspace 里的 *.cjs（回归套件）和 *.md（笔记）照旧入库。
+agent-workspace/out/
+agent-workspace/shots/
+agent-workspace/probe/out/
+
+# 各种运行日志
+*.log

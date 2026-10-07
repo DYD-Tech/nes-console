@@ -1,0 +1,14 @@
+{
+  "source": "https://github.com/libretro/libretro-fceumm.git",
+  "commit": "7a542dab1e87679921962a9f056186eca425c0c2",
+  "license": "GPL-2.0-or-later (third_party/libretro-fceumm/Copying)",
+  "toolchain": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.11 (a0014542110d6078c3a1a7941fa1ddb3a2281f16)",
+  "builtAt": "2026-10-05T20:24:53.431Z",
+  "defines": [
+    "__LIBRETRO__",
+    "PATH_MAX=1024",
+    "FCEU_VERSION_NUMERIC=9900",
+    "FRONTEND_SUPPORTS_RGB888"
+  ],
+  "optimization": "-O2"
+}

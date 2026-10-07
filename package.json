@@ -1,0 +1,25 @@
+{
+  "name": "nes-console",
+  "version": "0.1.0",
+  "description": "A pure frontend NES game console for the browser",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "build:core": "node scripts/build-core.cjs",
+    "test:fast": "node agent-workspace/run-regression.cjs --fast"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@astrojs/tailwind": "^5.1.0",
+    "astro": "^5.18.2",
+    "autoprefixer": "^10.4.0",
+    "playwright": "^1.63.0",
+    "postcss": "^8.4.30",
+    "tailwindcss": "^3.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
