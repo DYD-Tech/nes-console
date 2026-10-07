@@ -47,6 +47,69 @@ const boxOfMenu = (page) =>
     return { c: r.top + r.height / 2, h: r.height };
   });
 
+/**
+ * 把某个元素的分层颜色按 CSS 的实际合成顺序压到「纯白画面」和「纯黑画面」上，算出对比度。
+ *
+ * 为什么在页面里算：CSS 写的是 rgba 和变量，getComputedStyle 给的是浏览器已经解析好的值，
+ * 从这里取值才不会和样式表脱节（改了 CSS 数字这里跟着变，不用同步常量）。
+ *
+ * 为什么要「压到画面上算实色」再比：这些层全是半透明的，直接拿 rgba 里的 RGB 算出来的是错的
+ * （同 doc/color.md「对比度实测」一节的口径）。元素整体还有自己的 opacity，
+ * 相当于给每一层的 alpha 再乘一道 —— 这正是「游戏中看不清」的主因。
+ *
+ * @param sel       取哪一层的颜色
+ * @param opacityFrom 用哪个元素的 opacity（对照组要把手柄材质按按钮的实际透明度算）
+ */
+const contrastOf = (page, sel, opacityFrom = sel) => page.evaluate(([s, oSel]) => {
+  const cs = getComputedStyle(document.querySelector(s));
+  const opacity = parseFloat(getComputedStyle(document.querySelector(oSel)).opacity);
+  const rgba = (str) => {
+    const n = String(str).match(/[\d.]+/g) || [];
+    return n.length < 3 ? { r: 0, g: 0, b: 0, a: 0 }
+      : { r: +n[0], g: +n[1], b: +n[2], a: n.length > 3 ? +n[3] : 1 };
+  };
+  // 组内：c 画在 d 之上
+  const over = (c, d) => {
+    const a = c.a + d.a * (1 - c.a);
+    if (a === 0) return { r: 0, g: 0, b: 0, a: 0 };
+    return {
+      r: (c.r * c.a + d.r * d.a * (1 - c.a)) / a,
+      g: (c.g * c.a + d.g * d.a * (1 - c.a)) / a,
+      b: (c.b * c.a + d.b * d.a * (1 - c.a)) / a,
+      a,
+    };
+  };
+  // 元素整体（含各层自己的 alpha）再按 opacity 压到画面上
+  const onCanvas = (layer, canvas) =>
+    over({ ...layer, a: layer.a * opacity }, { r: canvas[0], g: canvas[1], b: canvas[2], a: 1 });
+  const lum = (c) => {
+    const f = (v) => { const x = v / 255; return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+  };
+  const ratio = (x, y) => {
+    const [a, b] = [lum(x), lum(y)];
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  const ringOut = rgba(cs.borderTopColor);
+  // 第二圈描边只能靠 inset box-shadow 画，取阴影串里的颜色（Chrome 把颜色写在最前面）
+  const ringIn = rgba((cs.boxShadow || 'none').replace(/^[^(]*\(/, 'rgba(').replace(/\).*$/, ')'));
+  const face = rgba(cs.backgroundColor);
+  const glyph = rgba(cs.color);
+  const out = {};
+  for (const [tag, canvas] of [['white', [255, 255, 255]], ['black', [0, 0, 0]]]) {
+    const bgc = { r: canvas[0], g: canvas[1], b: canvas[2], a: 1 };
+    out[`${tag}_ringOut`] = +ratio(onCanvas(ringOut, canvas), bgc).toFixed(2);
+    out[`${tag}_ringIn`] = +ratio(onCanvas(over(ringIn, face), canvas), bgc).toFixed(2);
+    // 内圈的邻居是外圈和深底，不是画面（它外面还压着 3px 外圈）—— 所以量它和对底的比
+    out[`${tag}_ringInFace`] = +ratio(onCanvas(over(ringIn, face), canvas), onCanvas(face, canvas)).toFixed(2);
+    out[`${tag}_glyph`] = +ratio(onCanvas(over(glyph, face), canvas), onCanvas(face, canvas)).toFixed(2);
+  }
+  // 底自己的亮度：确认它是「深」底，浅色字才有地方落
+  out.faceLumWhite = +lum(onCanvas(face, [255, 255, 255])).toFixed(3);
+  out.opacity = opacity;
+  return out;
+}, [sel, opacityFrom]);
+
 (async () => {
   const browser = await launch();
 
@@ -103,20 +166,25 @@ const boxOfMenu = (page) =>
     });
     check('按钮在最上层可点', clickable);
 
-    // 材质 = 和手柄上的按键同一套：同一份底色、同一档描边、同一字重。
-    // 形状反过来 —— 跟着屏幕里的界面元素走小圆角方块，不跟手柄的圆片。
-    // 拿 .touch-a（A 键）当基准现算，不写死色值：改了 --pad-surface 这里跟着变，
-    // 不会因为「两边都改了但常量没改」而假红/假绿。
+    // 形状 = 小圆角方块（跟屏幕里的界面元素），材质 = 自带对比的一整套。
+    // 这里刻意不跟手柄的 --pad-* 走：手柄按键压在近黑的页面底上，这两颗压在**游戏画面**上，
+    // 底下什么颜色都有可能，半透明浅灰描边压在亮画面上就和画面一个色 —— 按钮整个消失。
+    // 所以验的是「深浅两种画面下都分得出来」（WCAG 2.2 SC 1.4.11 非文本对比 ≥3:1），
+    // 而不是「和 A 键一个色」。粗细/字重这些不成问题的仍然对齐 A 键。
     const style = await page.evaluate(() => {
       const cs = (sel) => getComputedStyle(document.querySelector(sel));
       const m = cs('.touch-menu'), a = cs('.touch-a');
       return {
         radius: parseFloat(m.borderTopLeftRadius),
         w: parseFloat(m.width), h: parseFloat(m.height),
-        bg: m.backgroundColor, abg: a.backgroundColor,
+        bg: m.backgroundColor,
         bw: m.borderTopWidth, abw: a.borderTopWidth,
-        bc: m.borderTopColor, abc: a.borderTopColor,
         fw: m.fontWeight, afw: a.fontWeight,
+        // 双色描边：外圈走 border，内圈走 inset box-shadow（CSS 里第二圈只能这么画）
+        ringOut: m.borderTopColor,
+        ringIn: (m.boxShadow || '').replace(/^none$/, ''),
+        glyph: m.color,
+        opacity: parseFloat(m.opacity),
       };
     });
     check('形状是小圆角方块，不是圆片',
@@ -129,10 +197,26 @@ const boxOfMenu = (page) =>
       Math.abs(style.radius - style.w * (0.35 / 2.35)) <= 0.1,
       `radius=${style.radius} 边长=${style.w}`);
     check('宽高相等', Math.abs(style.w - style.h) < 0.5, `${style.w}x${style.h}`);
-    check('底色与 A 键一致', style.bg === style.abg, `${style.bg} vs ${style.abg}`);
     check('描边粗细与 A 键一致', style.bw === style.abw, `${style.bw} vs ${style.abw}`);
-    check('描边颜色与 A 键一致', style.bc === style.abc, `${style.bc} vs ${style.abc}`);
     check('字重与 A 键一致', style.fw === style.afw, `${style.fw} vs ${style.afw}`);
+    check('是内圈描边（box-shadow inset），不是只有一条 border',
+      /inset/.test(style.ringIn) && style.ringIn !== 'none', `box-shadow=${style.ringIn}`);
+
+    // 按下态不能被手柄的 `.touch-btn:active`（半透明强调青）接管：
+    // 那条会把底洗成浅色、把外圈换成亮青，按下这一下反而看不见按钮。
+    const pressRule = await page.evaluate(() => {
+      for (const sheet of document.styleSheets) {
+        let rules;
+        try { rules = sheet.cssRules; } catch { continue; } // 跨域表读不到，跳过
+        for (const r of rules || []) {
+          if (r.selectorText === '.screen .touch-menu:active, .screen .touch-fs:active') return r.style.cssText;
+        }
+      }
+      return '';
+    });
+    check('按下态自己写全了底色与描边（不沿用被画面洗掉的半透明强调色）',
+      /background/i.test(pressRule) && /box-shadow/i.test(pressRule) && /border-color/i.test(pressRule),
+      pressRule);
 
     // 初始状态主菜单已打开，先关闭
     await page.locator('.touch-menu').click();
@@ -143,6 +227,31 @@ const boxOfMenu = (page) =>
     // 菜单关闭时按钮半透明
     const opacityClosed0 = Math.min(...(await sample(page, opacityOf)));
     check('菜单关闭时按钮半透明（opacity<1）', opacityClosed0 < 1, `opacity=${opacityClosed0}`);
+
+    // 对比度实测放在菜单关闭之后：这才是用户说「看不清」的那一面 ——
+    // 按钮压在画面上、还带整体的透明度（菜单打开时是 1，好过得多，测不出问题）。
+    const contrast = await contrastOf(page, '.touch-menu');
+    console.log(`     对比度: ${JSON.stringify(contrast)}`);
+    // 双色描边的分工：外圈深色管亮画面、内圈浅色管暗画面，两条各自那一侧都要 ≥3:1，
+    // 缺一条就在另一种画面上消失。
+    check('外圈描边在白色画面上 ≥3:1', contrast.white_ringOut >= 3, JSON.stringify(contrast));
+    check('内圈描边在黑色画面上 ≥3:1', contrast.black_ringIn >= 3, JSON.stringify(contrast));
+    // 两条描边之间也要分得开，否则在任意画面上都只是一坨同色的边。
+    // 内圈的邻居是外圈和深底（它外面还压着 3px 外圈），量的是它和对底的比。
+    check('内圈描边和深底分得开 ≥3:1（白色画面时）', contrast.white_ringInFace >= 3, JSON.stringify(contrast));
+    check('内圈描边和深底分得开 ≥3:1（黑色画面时）', contrast.black_ringInFace >= 3, JSON.stringify(contrast));
+    check('外圈描边在黑色画面上不越界（深色画面里由内圈负责，外圈不该抢）',
+      contrast.black_ringOut <= 1.6, JSON.stringify(contrast));
+    check('字与图标在白色画面上对底 ≥3:1', contrast.white_glyph >= 3, JSON.stringify(contrast));
+    check('字与图标在黑色画面上对底 ≥3:1', contrast.black_glyph >= 3, JSON.stringify(contrast));
+    check('底是深底（压到白画面上亮度仍 <0.25，浅色字有地方落）',
+      contrast.faceLumWhite < 0.25, `lum=${contrast.faceLumWhite}`);
+    // 手柄那套材质（半透明浅灰描边）在亮画面上会消失 —— 拿 A 键当反例现算一遍，
+    // 说明「这两颗不跟 --pad-* 走」是有道理的，不是随手改的色。
+    // 透明度按按钮自己的取：算的是「手柄材质用在按钮的位置上会怎样」。
+    const padOnWhite = await contrastOf(page, '.touch-a', '.touch-menu');
+    check('对照组：手柄材质压在白色画面上确实分不出来（<3:1），所以这两颗不能沿用',
+      padOnWhite.white_ringOut < 3, JSON.stringify(padOnWhite));
 
     // 点击按钮 → 菜单打开
     await page.locator('.touch-menu').click();

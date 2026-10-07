@@ -208,6 +208,46 @@ const { selectGameRow } = require('./lib-game-menu.cjs');
   check('读取成功后状态栏写明读的是哪个槽', loadBack.status.includes('已读取'), loadBack.status);
   check('读取后菜单关闭回到游戏', loadBack.hidden === true);
 
+  console.log('\n【快速菜单：←/→ 换槽位】');
+  // 保存和读取两条都要能用 ←/→ 换槽位。曾经的坑：只有「保存存档」挂了 onAdjust，
+  // 「读取存档」按左右没反应 —— 想读别的槽得先进存档管理绕一圈。两条共用同一个
+  // quickSlot，所以换一边、另一边的显示也要跟着走。
+  const slotCycle = await page.evaluate(async () => {
+    await window.__press('Escape', 250);                 // 呼出快速菜单
+    const items = window.__ui().items;
+    for (let i = 0; i < items.length; i++) {
+      const sel = document.querySelector('.sys-item.selected .sys-item-label')?.textContent;
+      if (sel === '保存存档') break;
+      await window.__press('ArrowDown', 60);
+    }
+    // 当前那一行自己显示的槽位（不是靠下标推算，行变了读到的就变了）
+    const sub = () =>
+      document.querySelector('.sys-item.selected .sys-item-sub')?.textContent || '';
+    const saveBefore = sub();
+    await window.__press('ArrowRight', 200);
+    const saveAfter = sub();
+    await window.__press('ArrowDown', 200);              // 下一项就是「读取存档」
+    const label = document.querySelector('.sys-item.selected .sys-item-label')?.textContent;
+    const loadBefore = sub();
+    await window.__press('ArrowLeft', 200);
+    const loadAfter = sub();
+    // 收尾把菜单关掉：下面几段的起点是「游戏进行中、菜单关着」，
+    // 它们靠按 Esc 呼出菜单 —— 留着开的话第一下 Esc 变成关，整段就乱了。
+    await window.__press('Escape', 250);
+    return { label, saveBefore, saveAfter, loadBefore, loadAfter, hidden: document.querySelector('.sys-ui').hidden };
+  });
+  check('左右移动后焦点在「读取存档」上', slotCycle.label === '读取存档', slotCycle.label);
+  check('「保存存档」按 → 槽位变了',
+    slotCycle.saveBefore !== slotCycle.saveAfter && !!slotCycle.saveAfter,
+    JSON.stringify(slotCycle));
+  check('「读取存档」按 ← 槽位也变（和保存一样能换挡位）',
+    slotCycle.loadBefore !== slotCycle.loadAfter && !!slotCycle.loadAfter,
+    JSON.stringify(slotCycle));
+  check('两条显示同一个槽位（共用一个光标位：保存换到哪儿，读取那行就写哪儿）',
+    slotCycle.loadBefore === slotCycle.saveAfter,
+    `保存后=${slotCycle.saveAfter} 读取行显示=${slotCycle.loadBefore}`);
+  check('这一段收尾已回到游戏', slotCycle.hidden === true, `hidden=${slotCycle.hidden}`);
+
   console.log('\n【退出到主菜单】');
   const exited = await page.evaluate(async () => {
     await window.__press('Escape', 250);   // 打开快速菜单

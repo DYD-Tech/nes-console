@@ -20,7 +20,8 @@
   SELECT/START 两条扁条；右边五颗同尺寸圆片（上排 X/Y、中排 A/B，正方形正中还有一颗 A+B 组合键）。
   横竖屏都是左右分家、各管一个拇指，可以整块拖动摆位、可以逐颗显隐
 - **屏幕右上角两颗常驻按钮**：写着「菜单」的那颗呼出菜单，左边一颗全屏图标铺满屏幕
-  （触屏设备上顺手锁成横屏）。两颗同排同尺寸同材质，都不随菜单关闭而消失
+  （触屏设备上顺手锁成横屏）。两颗同排同尺寸，都不随菜单关闭而消失；描边一深一浅两条，
+  压在深色还是浅色游戏画面上都看得见
 - **即时存档**：自动存档 + 10 个手动槽位 + 快速存读，格式是不压缩的 RASTATE，
   可以直接拖进桌面 RetroArch 读取，RetroArch 存出来的档这里也能读；
   游戏自己写的电池进度另存一份，等价于 `.srm`
@@ -130,7 +131,7 @@ doc/                         实现文档，见下面「文档」
 ```bash
 npm run test:fast                              # 快档：3 条脚本 225 条断言，约 1 秒，不用构建、不用起站点
 npm run build && npx astro preview --port 7890 --host   # 浏览器脚本跑在构建产物上
-node agent-workspace/run-regression.cjs        # 全量：25 条约 995 条断言，约 6 分钟，汇总带每条耗时
+node agent-workspace/run-regression.cjs        # 全量：25 条约 1000 条断言，约 6 分钟，汇总带每条耗时
 node agent-workspace/run-regression.cjs wasm   # 参数是脚本名关键字，只跑相关的几条
 ```
 

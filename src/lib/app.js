@@ -696,6 +696,7 @@ function buildQuickMenu() {
             label: '读取存档',
             sublabel: SLOT_LABELS[quickSlot],
             onSelect: () => doLoad(quickSlot),
+            onAdjust: (dir) => { cycleQuickSlot(dir); ui.refresh(); },
           },
           {
             id: 'slots',
