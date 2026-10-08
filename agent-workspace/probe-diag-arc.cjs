@@ -4,7 +4,13 @@
  * 留空隙、elementFromPoint 命不命中那条透明命中带；再按三种位置看给不给方向。
  * 用法：node agent-workspace/probe-diag-arc.cjs
  */
+const { mkdirSync } = require('node:fs');
 const { launch } = require('./lib-browser.cjs');
+
+// 探针的截图只往 probe/out/ 里写：那是唯一被 .gitignore 整目录挡住的输出目录。
+// 散在 probe/ 根下就得为单个文件补忽略规则 —— 那是文件放错了地方，不是规则漏了一条。
+const OUT = 'agent-workspace/probe/out';
+mkdirSync(OUT, { recursive: true });
 
 const URL = 'http://localhost:7890/nes-console/';
 const SETTINGS_KEY = 'nes-console.settings';
@@ -145,24 +151,24 @@ const SETTINGS_KEY = 'nes-console.settings';
   print(`偏上 15° r=${ARC_R.toFixed(1)}（扇区内）`, `"${await pressPolar(-75, ARC_R)}"`);
   print(`偏上 23° r=${ARC_R.toFixed(1)}（出扇区、不在弧上）`, `"${await pressPolar(-67, ARC_R)}"`);
 
-  console.log('\n【3. 截图】agent-workspace/probe/diag-*.png');
+  console.log('\n【3. 截图】agent-workspace/probe/out/diag-*.png');
   const clip = {
     x: geo.pad.cx - geo.pad.w / 2 - 14, y: geo.pad.cy - geo.pad.w / 2 - 14,
     width: geo.pad.w + 28, height: geo.pad.w + 28,
   };
-  await page.screenshot({ path: 'agent-workspace/probe/diag-idle.png', clip });
+  await page.screenshot({ path: `${OUT}/diag-idle.png`, clip });
   const a = (-45 * Math.PI) / 180;
   await page.mouse.move(geo.pad.cx + ARC_R * Math.cos(a), geo.pad.cy + ARC_R * Math.sin(a));
   await page.mouse.down();
   await page.waitForTimeout(160);
-  await page.screenshot({ path: 'agent-workspace/probe/diag-press.png', clip });
+  await page.screenshot({ path: `${OUT}/diag-press.png`, clip });
   await page.mouse.up();
-  await page.screenshot({ path: 'agent-workspace/probe/diag-full.png', clip });
+  await page.screenshot({ path: `${OUT}/diag-full.png`, clip });
   const box = await page.evaluate(() => {
     const r = document.querySelector('#touch-controls').getBoundingClientRect();
     return { x: r.x - 6, y: r.y - 6, width: r.width + 12, height: r.height + 12 };
   });
-  await page.screenshot({ path: 'agent-workspace/probe/diag-controls.png', clip: box });
+  await page.screenshot({ path: `${OUT}/diag-controls.png`, clip: box });
 
   await browser.close();
 })();
