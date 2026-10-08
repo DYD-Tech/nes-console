@@ -94,7 +94,7 @@ const check = (label, ok, actual) => {
     };
   });
   check('强制显示手柄生效', geom.padVisible);
-  check('手柄按键共 11 个动作（含 X/Y 和簇心 AB）', geom.count === 11, `实际 ${geom.count}`);
+  check('手柄按键共 15 个动作声明（11 个按键动作 + 4 段斜向弧键）', geom.count === 15, `实际 ${geom.count}`);
   check('X 按钮显示且可点（没被别的元素盖住）', !!geom.x && geom.x.display !== 'none' && geom.x.hitSelf,
     geom.x && `display=${geom.x.display} 命中=${geom.x.hitTag}`);
   check('Y 按钮显示且可点', !!geom.y && geom.y.display !== 'none' && geom.y.hitSelf,
@@ -344,7 +344,7 @@ const check = (label, ok, actual) => {
     padGeom.a.right <= padGeom.b.x && padGeom.b.x > padGeom.a.x,
     `A=${padGeom.a.x}~${padGeom.a.right} B=${padGeom.b.x}`);
   check('X/Y 仍在上排（在 A/B 之上）', padGeom.x.y < padGeom.a.y, `X.y=${padGeom.x.y} A.y=${padGeom.a.y}`);
-  check('SELECT 挪到了左手那一列（十字键下方、动作簇左边）',
+  check('SELECT 在左手那一列（十字键下方、动作簇左边）',
     padGeom.select.y > padGeom.dpadBox.y && padGeom.select.right <= padGeom.actionsBox.x,
     `SELECT.y=${padGeom.select.y} 十字键.y=${padGeom.dpadBox.y} / SELECT 右沿=${padGeom.select.right} 动作簇.x=${padGeom.actionsBox.x}`);
   check('长按不弹 iOS 气泡：产出的 CSS 写了 -webkit-touch-callout: none',

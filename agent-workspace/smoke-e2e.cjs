@@ -49,6 +49,14 @@ const { selectGameRow } = require('./lib-game-menu.cjs');
     };
   });
 
+  console.log('\n【空屏提示】');
+  // 这句要把手柄上开菜单的办法说全 —— 两颗胶囊键摆成一边一颗就是为了组合键，
+  // 提示里不提，摸黑的人不知道它们能一起按。
+  const overlayText = await page.evaluate(() => document.getElementById('canvas-overlay').textContent.trim());
+  check('空屏提示写全了开菜单的办法（「菜单」按钮 / SELECT+START / Esc）',
+    /菜单/.test(overlayText) && /SELECT/.test(overlayText) && /START/.test(overlayText) && /Esc/.test(overlayText),
+    overlayText);
+
   console.log('\n【启动游戏】');
   // 内置游戏现在按文件名排好多样，第一项不固定，先把光标移到那款已知能跑的游戏上
   const picked = await selectGameRow(page, 'Destiny');

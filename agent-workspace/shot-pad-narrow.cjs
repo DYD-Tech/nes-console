@@ -46,8 +46,8 @@ function boxes(page) {
     const cs = getComputedStyle(document.getElementById('touch-controls'));
     return {
       dir: cs.flexDirection,
-      dpad: round(dpad), actions: round(r('.touch-actions')),
-      // 左手整块（十字键 + 下面的 SELECT/START）：竖屏能不能塞进余量要看它，不是只看十字键
+      dpad: round(dpad), actions: round(r('.touch-actions-group')),
+      // 两块都是「簇 + 下面一颗胶囊」，竖屏能不能塞进余量要看这两块的最底下，不是只看十字键
       leftGroup: round(r('.touch-dpad-group')),
       abxy: round(union(abxy)),
       dpadMidY: dpad ? Math.round(dpad.top + dpad.height / 2) : null,
@@ -77,7 +77,7 @@ async function main() {
     const lift = size.height - Math.max(b.dpad.bottom, b.actions.bottom);
     console.log(`\n【${size.name}】起游戏=${started ? 'OK' : '失败'} dir=${b.dir}`);
     console.log(`  方向键 ${JSON.stringify(b.dpad)} 中心Y=${b.dpadMidY}`);
-    console.log(`  左手块 ${JSON.stringify(b.leftGroup)}（十字键 + 系统键，最底下的东西）`);
+    console.log(`  左手块 ${JSON.stringify(b.leftGroup)}（十字键 + SELECT）· 右手块 ${JSON.stringify(b.actions)}（五键簇 + START）`);
     console.log(`  ABXY   ${JSON.stringify(b.abxy)} 中心Y=${b.abxyMidY} → 高差 ${b.dpadMidY - b.abxyMidY}px`);
     console.log(`  按键离底边 ${lift}px；两组横向间隙=${b.actions.left - b.dpad.right}px`);
     console.log(`  画面 ${b.screenTop}~${b.screenBottom}（离顶 ${b.screenTop}px），手柄顶 ${Math.min(b.dpad.top, b.actions.top)} → 空档 ${Math.min(b.dpad.top, b.actions.top) - b.screenBottom}px`);

@@ -242,6 +242,19 @@ const readStored = (page) => page.evaluate((k) => {
   check('摆放模式显示提示条', editState.editorShown === true);
   check('摆放模式给 .stage 打上标记', editState.editing === true);
 
+  // 两个拖动单位都要真的存在：selector 写错时构造里那句 filter 会把整块悄悄丢掉，
+  // 看起来一切正常，只是那块再也拖不动。两颗胶囊一边一颗之后，右手那块是新包出来的，
+  // 所以点名验「各带自己那颗」。
+  const units = await page.evaluate(() => ({
+    leftSelect: !!document.querySelector('.touch-dpad-group .touch-select'),
+    leftStart: !!document.querySelector('.touch-dpad-group .touch-start'),
+    rightStart: !!document.querySelector('.touch-actions-group .touch-start'),
+    rightCluster: !!document.querySelector('.touch-actions-group .touch-actions'),
+  }));
+  check('两块拖动单位都在，胶囊键一边一颗',
+    units.leftSelect && !units.leftStart && units.rightStart && units.rightCluster,
+    JSON.stringify(units));
+
   // 摆放模式下按按键组只拖动、不给游戏发按键
   const suppressed = await page.evaluate(() => {
     const el = document.querySelector('.touch-up');
@@ -296,16 +309,53 @@ const readStored = (page) => page.evaluate((k) => {
   check('偏移按比例存进 localStorage',
     typeof after.stored?.x === 'number' && after.stored.x > 0.1, JSON.stringify(after.stored));
 
+  // 右手那块（动作簇 + START）也要能整块拖：START 挪到这边之后，
+  // 它跟着簇走才是「拖一块管两颗键」，否则用户得能拖单键（没这功能）。
+  const rBefore = await page.evaluate(() => {
+    const g = document.querySelector('.touch-actions-group').getBoundingClientRect();
+    const s = document.querySelector('.touch-start').getBoundingClientRect();
+    return { x: g.x, y: g.y, startDx: s.x - g.x };
+  });
+  await page.mouse.move(rBefore.x + 30, rBefore.y + 30);
+  await page.mouse.down();
+  await page.mouse.move(rBefore.x - 150, rBefore.y - 120, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(250);
+  const rAfter = await page.evaluate(() => {
+    const g = document.querySelector('.touch-actions-group').getBoundingClientRect();
+    const s = document.querySelector('.touch-start').getBoundingClientRect();
+    return {
+      x: g.x,
+      startDx: s.x - g.x,
+      stored: JSON.parse(localStorage.getItem('nes-console.settings') || '{}').controls?.padLayout?.actions,
+    };
+  });
+  check('右手那块能整块拖动', Math.abs(rAfter.x - rBefore.x) > 100,
+    `位移 ${Math.round(rAfter.x - rBefore.x)}px`);
+  check('START 跟着簇一起走（相对块的位置不变）',
+    Math.abs(rAfter.startDx - rBefore.startDx) < 1,
+    `拖动前 ${rBefore.startDx.toFixed(0)}px / 拖动后 ${rAfter.startDx.toFixed(0)}px`);
+  check('右手偏移存进 padLayout.actions',
+    typeof rAfter.stored?.x === 'number' && rAfter.stored.x < -0.1, JSON.stringify(rAfter.stored));
+
   // 复位
   await page.click('[data-editor="reset"]');
   await page.waitForTimeout(250);
-  const reset = await page.evaluate(() => ({
-    transform: document.querySelector('.touch-dpad-group').style.transform,
-    stored: JSON.parse(localStorage.getItem('nes-console.settings') || '{}').controls?.padLayout?.dpad,
-  }));
-  check('「恢复默认位置」清掉 transform', reset.transform === '', reset.transform);
-  check('「恢复默认位置」写回零偏移', reset.stored?.x === 0 && reset.stored?.y === 0,
-    JSON.stringify(reset.stored));
+  const reset = await page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem('nes-console.settings') || '{}').controls?.padLayout;
+    return {
+      transform: document.querySelector('.touch-dpad-group').style.transform,
+      rightTransform: document.querySelector('.touch-actions-group').style.transform,
+      dpad: stored?.dpad,
+      actions: stored?.actions,
+    };
+  });
+  check('「恢复默认位置」清掉 transform',
+    reset.transform === '' && reset.rightTransform === '',
+    `左 "${reset.transform}" 右 "${reset.rightTransform}"`);
+  check('「恢复默认位置」两块都写回零偏移',
+    reset.dpad?.x === 0 && reset.dpad?.y === 0 && reset.actions?.x === 0 && reset.actions?.y === 0,
+    JSON.stringify({ dpad: reset.dpad, actions: reset.actions }));
 
   // 退出
   await page.click('[data-editor="done"]');

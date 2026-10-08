@@ -124,8 +124,9 @@ for (const cat of SETTINGS_SCHEMA) {
 layout.apply();
 
 // 触摸手柄：把 DOM 按钮绑到动作上
-// 触摸设备上没有 SELECT+START 组合键可用（两个键同时按很别扭），
-// 所以额外提供一个独立的菜单按钮直接触发 MENU 动作。
+// SELECT 在左手、START 在右手，两只拇指一起按就是 SELECT+START 组合键（呼出菜单，
+// 见 input-manager.js 的 COMBOS）。屏幕右上角另有一颗独立的「菜单」按钮，
+// 给「只想开菜单、不想把两只拇指都挪开」的场合用。
 bindTouchControls();
 
 requestPersistence();
@@ -332,7 +333,7 @@ function buildMainMenu() {
           {
             id: 'h-menu',
             label: '呼出 / 关闭菜单',
-            sublabel: '屏幕右上角的「菜单」按钮也能点',
+            sublabel: '两颗一个在左手边、一个在右手边，两只拇指一起按就行；也可以点屏幕右上角的「菜单」',
             value: `${key(ACTIONS.MENU)} 或 SELECT + START`,
           },
           {
@@ -524,8 +525,8 @@ const ACTION_SUBLABELS = {
   // 所有手柄都有），所以这两个动作目前谁都不做，只是「按得动、可绑定」。
   [ACTIONS.X]: '界面不使用（NES 无此键位）',
   [ACTIONS.Y]: '界面不使用（NES 无此键位）',
-  [ACTIONS.SELECT]: '与 START 一起按也呼出菜单',
-  [ACTIONS.START]: '游戏里的 Start',
+  [ACTIONS.SELECT]: '在手柄左下，和右下的 START 一起按也能呼出菜单',
+  [ACTIONS.START]: '游戏里的 Start（在手柄右下）',
   [ACTIONS.MENU]: 'Esc 保留作「取消改绑」，所以不能绑到 Esc',
 };
 
@@ -1314,8 +1315,8 @@ async function loadSaveFromList(game, slot) {
  * 加一个按钮只改 HTML，不用改这段代码。
  * 属性值可以写多个动作（空格隔开，如「A B」），按住这个按钮就等于同时按住那几个键。
  *
- * 十字键例外：它的四个臂只是「哪个方向占哪块位置」的声明，
- * 按键由整块十字按扇区判定（要支持斜向，一个臂一个按钮按不出「上+右」）。
+ * 十字键例外：它的四个臂和四段斜向弧只是「哪个方向 / 哪两个方向占哪块位置」的声明，
+ * 按键由整块十字统一判定（一个臂一个按钮按不出「上+右」，也划不出独立于拨片的斜向键）。
  */
 function bindTouchControls() {
   const dpad = document.querySelector('.touch-dpad');

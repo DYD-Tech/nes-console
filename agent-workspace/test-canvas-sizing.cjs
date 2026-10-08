@@ -31,9 +31,9 @@ const { launch } = require('./lib-browser.cjs');
       const tw = Math.min(innerWidth, innerHeight * 4 / 3);
       const th = tw * 3 / 4;
       // #touch-controls 是一条铺满视口宽度的透明轨道，量它的矩形等于量空气；
-      // 真正看得见的是两块按键组（左手：十字键 + 系统键 / 右手：五键簇），逐组算遮挡再相加。
+      // 真正看得见的是两块按键组（左手：十字键 + SELECT / 右手：五键簇 + START），逐组算遮挡再相加。
       const groups = Array.from(document.querySelectorAll(
-        '#touch-controls .touch-dpad-group, #touch-controls .touch-actions',
+        '#touch-controls .touch-dpad-group, #touch-controls .touch-actions-group',
       ));
       let overlapArea = 0;
       let shown = 0;

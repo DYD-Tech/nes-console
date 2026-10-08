@@ -53,7 +53,7 @@ const URL = 'http://localhost:7890/nes-console/';
       padBox: box('#touch-controls'),
       // 「平衡」要看的两条：两块同宽、且十字键中心和五键簇中心在同一条水平线上
       left: box('.touch-dpad-group'),
-      right: box('.touch-actions'),
+      right: box('.touch-actions-group'),
       dpad: box('.touch-dpad'),
     };
   });

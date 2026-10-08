@@ -314,18 +314,25 @@ export class InputManager {
   }
 
   /**
-   * 把四片拨片拼成的十字方向键绑成方向输入。
+   * 把四片拨片（四个方向）+ 外切圆上四段细弧（四个斜向）绑成方向输入。
    *
-   * 为什么不像 A/B 那样一键一动作：拇指按不出「同时按上和右」，而真机的斜向本来就靠
-   * 按在两个臂中间。对标 Microsoft《Touch Adaptation Kit》d-pad（activationType 默认
-   * allowNeighboring，死区是轴向方形）与 RetroArch 覆盖层的 dir-8-way：
-   * 按指针相对十字中心的角度分扇区，落在两臂中间就同时给两个方向。
+   * 四个方向按扇区判：指针相对十字中心，离某个臂不超过 ±22.5° 就只给那个方向，
+   * 拇指按歪一点不会出斜向。臂的方位不写死：每次按下现量 `.touch-dpad-arm` 的
+   * data-action 与实际盒子，所以 CSS 改了排布、摆放模式拖过位置、转屏，判定都跟着变。
+   * 中心方形区域是死区。
    *
-   * 四个臂的方位不写死：每次按下现量臂的 data-action 与实际盒子，
-   * 所以拖动过、转屏后都不用同步常量，也不会在 display:none 时量到全 0。
+   * **斜向只由那四段弧给**（`.dpad-diag`，按住 = data-action 里两个方向同时按下），
+   * 四片之间的空白什么都不给 —— 这一条**有意偏离**两个对标来源：Microsoft
+   * 《Touch Adaptation Kit》的 d-pad `activationType` 默认 `allowNeighboring`、
+   * RetroArch 默认覆盖层的 `dir-8-way`，都是「按在两臂之间就同时给两个方向」。
+   * 偏离的原因是实际用起来那条缝拇指常常扫到，「只想往上」会走出一个斜上，
+   * 误触比漏按更难查。查过同类虚拟手柄（四个独立按钮拼接、一整块八方向、覆盖层
+   * dir-8-way），没有「把斜向单独做成一圈弧键」的成品可抄，所以判定逻辑自研；
+   * 死区仍是轴向方形（和上面两条一致）。
    *
-   * 监听挂在容器上（命中的是子元素 .touch-dpad-hit / 臂）：摆放模式的拦截在同一容器的
-   * 捕获阶段，只有目标是后代元素时拦截才发生在目标之前 —— 见 touch-layout.js 的 _onUnitPointerDown。
+   * 监听挂在容器上（命中的是子元素 .touch-dpad-hit / 四个臂 / 四段弧的命中带，容器自己是
+   * pointer-events: none）：摆放模式的拦截在同一容器的捕获阶段，只有目标是后代元素时拦截才发生在
+   * 目标之前 —— 见 touch-layout.js 的 _onUnitPointerDown。
    *
    * @param {HTMLElement} el - .touch-dpad
    */
@@ -333,7 +340,9 @@ export class InputManager {
     // 死区是边长为十字 16% 的方形（0.08 是半宽）。四片尖头收在离中心 11%，
     // 刚好落在死区外：画出来的部分都按得动，中间那道空缝就是死区，不必再画中心点。
     const DEADZONE = 0.08;
-    const dirActions = Array.from(el.querySelectorAll('[data-action]')).map((a) => a.dataset.action);
+    const SECTOR = Math.PI / 8; // 一个臂独占 ±22.5°
+    const arms = Array.from(el.querySelectorAll('.touch-dpad-arm[data-action]'));
+    const dirActions = arms.map((a) => a.dataset.action);
     /** 每根手指当前按住的行动作：pointerId -> [action] */
     const fingers = new Map();
 
@@ -345,8 +354,14 @@ export class InputManager {
       const dx = e.clientX - cx;
       const dy = e.clientY - cy;
       if (Math.abs(dx) <= box.width * DEADZONE && Math.abs(dy) <= box.height * DEADZONE) return [];
+      // 斜向弧键先判：按到画出来那段弧（命中带的粗细见 global.css 的 .dpad-diag-hit）才给两个方向。
+      // 这里按屏幕坐标重新命中，而不是读 e.target —— 指针被容器捕获后 e.target 一直是容器，
+      // 手指滑进滑出弧键都收不到别的 target，滑动换向就判不出来。
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const diag = under ? under.closest('.dpad-diag[data-action]') : null;
+      if (diag) return diag.dataset.action.trim().split(/\s+/);
       const angle = Math.atan2(dy, dx);
-      const arms = Array.from(el.querySelectorAll('[data-action]'))
+      const near = arms
         .map((arm) => {
           const r = arm.getBoundingClientRect();
           return {
@@ -356,15 +371,8 @@ export class InputManager {
           };
         })
         .sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
-      const out = [arms[0].action];
-      const next = arms[1];
-      // 最近的臂已经超出它的独占范围（±22.5°），且第二近的臂在另一侧 —— 就是斜向
-      if (next && Math.abs(arms[0].delta) > Math.PI / 8
-        && Math.sign(next.delta) !== Math.sign(arms[0].delta)
-        && Math.abs(next.delta) < Math.PI / 2) {
-        out.push(next.action);
-      }
-      return out;
+      // 只在自己那 ±22.5° 里给方向；出了这个范围又没按到弧，就是四片之间的空白 —— 不给任何方向
+      return Math.abs(near[0].delta) <= SECTOR ? [near[0].action] : [];
     };
 
     /** 所有手指按住的方向取并集，再分发给动作 */

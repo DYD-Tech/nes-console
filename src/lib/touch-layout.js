@@ -33,8 +33,8 @@ const GROUP_SELECTOR = {
  * 这份列表就是 padLayout 的键名来源（不再有第二份常量）。
  */
 export const DRAG_UNITS = [
-  { id: 'dpad', selector: '.touch-dpad-group', label: '方向键 + SELECT/START' },
-  { id: 'actions', selector: '.touch-actions', label: 'A/B/X/Y 与中间的 AB' },
+  { id: 'dpad', selector: '.touch-dpad-group', label: '方向键 + SELECT' },
+  { id: 'actions', selector: '.touch-actions-group', label: 'A/B/X/Y、AB 与 START' },
 ];
 
 export class TouchLayout {

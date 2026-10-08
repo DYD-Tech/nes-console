@@ -44,7 +44,7 @@ async function main() {
     console.log(`\n【${size.name}】格子顶 ${m.padBoxTop.toFixed(2)} · 十字画出来的顶 ${m.bladePaintTop.toFixed(2)} · X/Y 顶 ${m.xTop.toFixed(2)}/${m.yTop.toFixed(2)} · 描边 ${m.linePx.toFixed(2)}px`);
     const clip = await page.evaluate(() => {
       const l = document.querySelector('.touch-dpad-group').getBoundingClientRect();
-      const r = document.querySelector('.touch-actions').getBoundingClientRect();
+      const r = document.querySelector('.touch-actions-group').getBoundingClientRect();
       return { x: l.left, y: l.top - 10, width: r.right - l.left, height: Math.max(l.bottom, r.bottom) - l.top + 10 };
     });
     await page.screenshot({ path: path.join(OUT, `pad-align-${size.name}.png`), clip });

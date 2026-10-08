@@ -1,5 +1,7 @@
-// 验证十字方向键：四片软拨片的外形与命中、八个扇区的判定、按住滑动换向、
+// 验证十字方向键：四片软拨片 + 外切圆上四段独立斜向弧键的外形与命中、
+// 四个扇区 + 四段弧 + 空白的判定、按住滑动换向、
 // 多指并集、斜向真的送进模拟器（和键盘同一形状），以及摆放模式下不发按键。
+// 顺带钉住两颗胶囊键的摆位（一边一颗、同一条水平线）与「两手同时按呼出菜单」。
 const { launch } = require('./lib-browser.cjs');
 const { startGame } = require('./lib-game-menu.cjs');
 
@@ -47,7 +49,7 @@ async function clickItem(page, label) {
   await page.goto(URL, { waitUntil: 'networkidle' });
   await page.waitForTimeout(500);
 
-  console.log('\n【1. 形状：四片拨片拼成的十字，不是一个方向一个圆钮】');
+  console.log('\n【1. 形状：四片拨片拼成的十字 + 外切圆上四段独立细弧（斜向）】');
   const geo = await page.evaluate(() => {
     const rect = (sel) => {
       const el = document.querySelector(sel);
@@ -60,8 +62,45 @@ async function clickItem(page, label) {
     const arms = ['UP', 'DOWN', 'LEFT', 'RIGHT'].map((a) => ({
       action: a, ...rect(`.touch-dpad [data-action="${a}"]`),
     }));
+    // 斜向弧键的几何：沿 use 引用的那条 path 采样，换算到屏幕像素。
+    // 要看的是「弧是不是真的贴着十字外缘画的那道圆」「和拨片之间留没留出空隙」。
+    const sample = (sel) => {
+      const use = document.querySelector(sel);
+      const src = document.getElementById(use.getAttribute('href').slice(1));
+      const ctm = use.getScreenCTM();
+      const pts = [];
+      for (let i = 0; i <= 40; i++) {
+        const p = src.getPointAtLength((src.getTotalLength() * i) / 40);
+        const q = new DOMPoint(p.x, p.y).matrixTransform(ctm);
+        pts.push([q.x, q.y]);
+      }
+      return pts;
+    };
+    const rOf = (p) => Math.hypot(p[0] - pad.cx, p[1] - pad.cy);
+    const bladePts = ['up', 'right', 'down', 'left'].flatMap((s) => sample(`.dpad-blade-${s}`));
+    // 拨片外缘最外那圈到中心的距离 = 十字的外接半径，弧就该画在这道圆上
+    const bladeOuterR = Math.max(...bladePts.map(rOf));
+    const perUnit = pad.w / document.querySelector('.touch-dpad-face').viewBox.baseVal.width;
+    const hitHalfPx = parseFloat(getComputedStyle(document.querySelector('.dpad-diag-hit')).strokeWidth) * perUnit / 2;
+    const diags = ['up-right', 'right-down', 'down-left', 'left-up'].map((s) => {
+      const face = sample(`.dpad-diag-${s} .dpad-diag-face`);
+      const radii = face.map(rOf);
+      let gap = Infinity;
+      for (const p of face) for (const b of bladePts) gap = Math.min(gap, Math.hypot(p[0] - b[0], p[1] - b[1]));
+      // 命中带最外侧（含半个描边）离中心轴的水平/垂直距离：不能越出格子，越出去就压到别的键
+      const reach = Math.max(...face.map((p) => Math.max(Math.abs(p[0] - pad.cx), Math.abs(p[1] - pad.cy)))) + hitHalfPx;
+      return {
+        action: document.querySelector(`.dpad-diag-${s}`).dataset.action,
+        rMin: Math.min(...radii), rMax: Math.max(...radii), gap, reach,
+        len: face.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - face[i][0], p[1] - face[i][1]), 0),
+      };
+    });
     return {
-      pad, hit, arms,
+      pad, hit, arms, diags, bladeOuterR,
+      diagCount: document.querySelectorAll('.dpad-diag').length,
+      diagFaceStroke: parseFloat(getComputedStyle(document.querySelector('.dpad-diag-face')).strokeWidth) * perUnit,
+      diagHitStroke: hitHalfPx * 2,
+      diagHitPE: getComputedStyle(document.querySelector('.dpad-diag-hit')).pointerEvents,
       square: Math.abs(pad.w - pad.h) < 1,
       hitCoversPad: Math.abs(hit.w - pad.w) < 1 && Math.abs(hit.h - pad.h) < 1,
       blades: document.querySelectorAll('.touch-dpad-face > use').length,
@@ -83,7 +122,8 @@ async function clickItem(page, label) {
           return { action: b.dataset.action, w: box.width, h: box.height, top: box.top, left: box.left, r };
         }),
       // 左右两块（摆放模式各是一个拖动单位）：配平要量的就是这两块的宽
-      groups: { left: rect('.touch-dpad-group'), right: rect('.touch-actions') },
+      groups: { left: rect('.touch-dpad-group'), right: rect('.touch-actions-group') },
+      cluster: rect('.touch-actions'),
       btnBg: getComputedStyle(document.querySelector('.touch-a')).backgroundColor,
       btnLine: getComputedStyle(document.querySelector('.touch-a')).borderTopColor,
       btnLineW: parseFloat(getComputedStyle(document.querySelector('.touch-a')).borderTopWidth),
@@ -98,7 +138,7 @@ async function clickItem(page, label) {
     };
   });
   check('十字键容器是正方形', geo.square, `${geo.pad.w.toFixed(0)}x${geo.pad.h.toFixed(0)}`);
-  check('命中层铺满整块十字（四角也算按键，斜向来自这里）', geo.hitCoversPad);
+  check('命中层铺满整块十字（按在四角空白也收得到按下，只是不给方向）', geo.hitCoversPad);
   check('四个臂各占一格且不小于 44px',
     geo.arms.length === 4 && geo.arms.every((a) => a.w >= 44 && a.h >= 44),
     geo.arms.map((a) => `${a.action}=${a.w.toFixed(0)}x${a.h.toFixed(0)}`).join(' '));
@@ -110,10 +150,32 @@ async function clickItem(page, label) {
   check('外形是四片同形状的拨片，中心不画东西（空缝就是死区）',
     geo.blades === 4 && geo.sameShape && geo.centerEmpty,
     `use=${geo.blades} 同形状=${geo.sameShape} 中心空=${geo.centerEmpty}`);
+  // 斜向是四段独立的细圆弧：贴着十字的外缘那道圆画，和四片拨片之间留一道看得见的空隙。
+  // 「不连接」是用户要的重点 —— 空隙没了就说明弧又跟拨片糊回去，误触会跟着回来。
+  check('斜向是四段独立弧键，一段管两个方向',
+    geo.diagCount === 4 && geo.diags.every((d) => d.action.split(' ').length === 2),
+    geo.diags.map((d) => d.action).join(' | '));
+  check('四段弧同半径，且就落在拨片外缘那道圆上（外切圆）',
+    geo.diags.every((d) => Math.abs(d.rMax - d.rMin) < 0.5
+      && Math.abs(d.rMin - geo.bladeOuterR) <= 1.5),
+    `弧 ${geo.diags[0].rMin.toFixed(2)}~${geo.diags[0].rMax.toFixed(2)}px / 拨片外缘 ${geo.bladeOuterR.toFixed(2)}px`);
+  check('弧和拨片之间留着空隙（没有连回去）',
+    geo.diags.every((d) => d.gap >= 4),
+    `最近 ${Math.min(...geo.diags.map((d) => d.gap)).toFixed(1)}px`);
+  check('弧很细（可见不到 5px），但命中带粗到按得住（≥14px）',
+    geo.diagFaceStroke <= 5 && geo.diagHitStroke >= 14 && geo.diagHitPE === 'stroke',
+    `可见 ${geo.diagFaceStroke.toFixed(2)}px / 命中 ${geo.diagHitStroke.toFixed(2)}px / ${geo.diagHitPE}`);
+  check('弧的命中带不出格子（不会压到旁边的键）',
+    geo.diags.every((d) => d.reach <= geo.pad.w / 2),
+    `最外 ${Math.max(...geo.diags.map((d) => d.reach)).toFixed(1)}px / 半格 ${geo.pad.w / 2}px`);
+  check('弧长短合适：看得见（≥18px，含圆头）、又没长到快贴上拨片（≤28px）',
+    geo.diags.every((d) => d.len >= 18 && d.len <= 28),
+    geo.diags.map((d) => d.len.toFixed(1)).join(' '));
   check('容器不吃事件，命中交给子元素（摆放模式拦截依赖这条）',
     geo.padPointerEvents === 'none' && geo.hitPointerEvents === 'auto',
     `${geo.padPointerEvents}/${geo.hitPointerEvents}`);
-  check('手柄上一共声明 11 个动作（4 方向 + 6 键 + 簇心 AB）', geo.actions.length === 11, geo.actions.join(','));
+  check('手柄上一共声明 15 个动作（4 方向 + 4 段斜向弧 + 6 键 + 簇心 AB）',
+    geo.actions.length === 15, geo.actions.join(','));
   check('独立按钮 7 个（十字键的臂不再算按钮）', geo.btnCount === 7, `${geo.btnCount}`);
   check('A/B/X/Y 同尺寸', new Set(geo.btnSizes.filter((s) => /^[ABXY]=/.test(s))
     .map((s) => s.split('=')[1])).size === 1, geo.btnSizes.join(' '));
@@ -149,20 +211,68 @@ async function clickItem(page, label) {
   check('SELECT/START 是扁长条（不是圆片）',
     shape(/^(SELECT|START)$/).length === 2 && shape(/^(SELECT|START)$/).every((b) => b.w / b.h >= 1.8 && b.r >= b.h / 2 - 0.5),
     fmt(shape(/^(SELECT|START)$/)));
-  // 摆位：系统键在十字键下面（左手一列），不再挤在动作键那一块里
+  // 摆位：两颗胶囊一边一颗（SELECT 在十字键下面、START 在动作簇下面），
+  // 这样两只拇指各按住一颗才凑得齐 SELECT+START 组合键 —— 挤在同一角就按不到一起。
   const bars = shape(/^(SELECT|START)$/);
+  const bar = (a) => bars.find((b) => b.action === a);
   const padBottom = geo.pad.y + geo.pad.h;
-  check('SELECT/START 摆在十字键下方',
-    bars.length === 2 && bars.every((s) => s.top > padBottom),
-    `条 top=${bars.map((b) => Math.round(b.top)).join('/')} · 十字键底=${Math.round(padBottom)}`);
-  // 「平衡」的两条：两块同宽，且扁条那一整列在动作簇的左边（各归一个拇指）
+  const clusterBottom = geo.cluster.y + geo.cluster.h;
+  check('SELECT 摆在十字键下方、START 摆在动作簇下方',
+    bars.length === 2 && bar('SELECT').top > padBottom && bar('START').top > clusterBottom,
+    `SELECT top=${Math.round(bar('SELECT').top)} 十字键底=${Math.round(padBottom)} · `
+    + `START top=${Math.round(bar('START').top)} 动作簇底=${Math.round(clusterBottom)}`);
+  const cx = (b) => b.left + b.w / 2;
+  check('两颗胶囊各自在自己那一块里居中',
+    Math.abs(cx(bar('SELECT')) - geo.groups.left.cx) < 1
+    && Math.abs(cx(bar('START')) - geo.groups.right.cx) < 1,
+    `SELECT 中=${Math.round(cx(bar('SELECT')))} 左块中=${Math.round(geo.groups.left.cx)} · `
+    + `START 中=${Math.round(cx(bar('START')))} 右块中=${Math.round(geo.groups.right.cx)}`);
+  check('两颗胶囊在同一条水平线上（两手同时按）',
+    Math.abs(bar('SELECT').top - bar('START').top) < 1,
+    `SELECT ${Math.round(bar('SELECT').top)} / START ${Math.round(bar('START').top)}`);
+  check('SELECT 在左半、START 在右半，中间隔着整块簇',
+    bar('SELECT').left + bar('SELECT').w <= geo.groups.right.x + 1
+    && bar('START').left >= geo.groups.left.x + geo.groups.left.w - 1,
+    `SELECT 右沿=${Math.round(bar('SELECT').left + bar('SELECT').w)} · 右块左沿=${Math.round(geo.groups.right.x)}`);
+  // 「平衡」的两条：两块同宽同高、底边对齐（同构 = 簇 + 一条扁键）
   const groups = geo.groups;
-  check('左右两块同宽（配平：左边十字+系统键，右边五键簇）',
-    Math.abs(groups.left.w - groups.right.w) < 1,
-    `左 ${groups.left.w.toFixed(0)}px / 右 ${groups.right.w.toFixed(0)}px`);
-  check('SELECT/START 整排在动作簇左边（不越界到右手）',
-    bars.every((b) => b.left + b.w <= groups.right.x + 1),
-    `条右沿=${bars.map((b) => Math.round(b.left + b.w)).join('/')} · 右块左沿=${Math.round(groups.right.x)}`);
+  check('左右两块同宽同高（配平：都是「簇 + 下面一条扁键」）',
+    Math.abs(groups.left.w - groups.right.w) < 1 && Math.abs(groups.left.h - groups.right.h) < 1,
+    `左 ${groups.left.w.toFixed(0)}x${groups.left.h.toFixed(0)} / 右 ${groups.right.w.toFixed(0)}x${groups.right.h.toFixed(0)}`);
+  check('左右两块底边对齐（扁键那一排齐平，簇中心也齐平）',
+    Math.abs((groups.left.y + groups.left.h) - (groups.right.y + groups.right.h)) < 1
+    && Math.abs(geo.pad.cy - geo.cluster.cy) < 1,
+    `底 ${Math.round(groups.left.y + groups.left.h)}/${Math.round(groups.right.y + groups.right.h)} · `
+    + `中心 ${Math.round(geo.pad.cy)}/${Math.round(geo.cluster.cy)}`);
+
+  // 挪这一颗就是为了这条：两只手各按住一颗胶囊，组合键才成立。
+  // 手指同时按两个按钮 = 两个 pointerId 各自按下，所以这里发两个 PointerEvent，
+  // 不用鼠标（鼠标只有一个指针，按不住两颗）。
+  console.log('\n【1b. 屏幕上两只拇指同时按 SELECT + START 能呼出菜单】');
+  const menuHidden = () => page.evaluate(() => document.querySelector('.sys-ui').hidden);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  check('起点：菜单是关着的', await menuHidden() === true);
+  const twoThumbs = await page.evaluate(async () => {
+    const fire = (sel, type, id) => {
+      const r = document.querySelector(sel).getBoundingClientRect();
+      document.querySelector(sel).dispatchEvent(new PointerEvent(type, {
+        pointerId: id, pointerType: 'touch', isPrimary: id === 1, bubbles: true, cancelable: true,
+        clientX: r.x + r.width / 2, clientY: r.y + r.height / 2, buttons: type === 'pointerdown' ? 1 : 0,
+      }));
+    };
+    fire('.touch-select', 'pointerdown', 1);
+    await new Promise((r) => setTimeout(r, 60));
+    fire('.touch-start', 'pointerdown', 2);
+    await new Promise((r) => setTimeout(r, 260));
+    const opened = !document.querySelector('.sys-ui').hidden;
+    fire('.touch-select', 'pointerup', 1);
+    fire('.touch-start', 'pointerup', 2);
+    await new Promise((r) => setTimeout(r, 260));
+    return { opened, stillOpen: !document.querySelector('.sys-ui').hidden };
+  });
+  check('两只拇指各按住一颗 → 菜单打开', twoThumbs.opened === true);
+  check('两根手指都松开后菜单还在（没被二次触发关掉）', twoThumbs.stillOpen === true);
 
   const pad = geo.pad;
   const active = () => page.evaluate(() => document.querySelector('.touch-dpad').dataset.active || '');
@@ -176,22 +286,39 @@ async function clickItem(page, label) {
     await page.waitForTimeout(60);
     return got;
   };
-  console.log('\n【2. 八个扇区：正方向给一个，两臂之间给两个，中心是死区】');
+  // 半径用实测值（弧就画在拨片外缘那道圆上）：格子尺寸一改，写死的数字会按到空白上。
+  const arcR = (geo.diags[0].rMin + geo.diags[0].rMax) / 2;
+  /** 按住「离中心 r 像素、方向 deg 度（屏幕坐标：0=右，负角朝上）」那个点 */
+  const pressPolar = async (deg, r) => {
+    const a = (deg * Math.PI) / 180;
+    await page.mouse.move(pad.cx + r * Math.cos(a), pad.cy + r * Math.sin(a));
+    await page.mouse.down();
+    await page.waitForTimeout(60);
+    const got = await active();
+    await page.mouse.up();
+    await page.waitForTimeout(60);
+    return got;
+  };
+  const sorted = (s) => s.split(' ').sort().join(' ');
+  console.log('\n【2. 判定：四个扇区各给一个方向，四段弧给两个，弧和拨片之间的空白什么都不给】');
   check('正上 = UP', (await pressDir(0, -1)) === 'UP');
   check('正下 = DOWN', (await pressDir(0, 1)) === 'DOWN');
   check('正左 = LEFT', (await pressDir(-1, 0)) === 'LEFT');
   check('正右 = RIGHT', (await pressDir(1, 0)) === 'RIGHT');
-  const dr = await pressDir(0.707, 0.707);
-  check('右下（两臂之间）= RIGHT + DOWN', dr.split(' ').sort().join(' ') === 'DOWN RIGHT', dr);
-  const ur = await pressDir(0.707, -0.707);
-  check('右上 = RIGHT + UP', ur.split(' ').sort().join(' ') === 'RIGHT UP', ur);
-  const ul = await pressDir(-0.707, -0.707);
-  check('左上 = LEFT + UP', ul.split(' ').sort().join(' ') === 'LEFT UP', ul);
-  const dl = await pressDir(-0.707, 0.707);
-  check('左下 = LEFT + DOWN', dl.split(' ').sort().join(' ') === 'DOWN LEFT', dl);
+  // 斜向只认那四段弧：按在弧上才给两个方向（弧的中点正好在 45° 上）
+  for (const [deg, want] of [[-45, 'RIGHT UP'], [45, 'DOWN RIGHT'], [135, 'DOWN LEFT'], [-135, 'LEFT UP']]) {
+    const got = await pressPolar(deg, arcR);
+    check(`按 ${deg}° 那道弧 = ${want}`, sorted(got) === want, got);
+  }
+  // 这次改的目的就在这里：拇指常扫到弧和拨片之间、以及弧外面那些空白，
+  // 以前那里算斜向，误触比漏按难查得多。现在按了没反应才是对的。
+  for (const deg of [-45, 45]) {
+    check(`斜角空白·弧内侧（${deg}° 半径 40px）不给方向`, (await pressPolar(deg, 40)) === '');
+    check(`斜角空白·弧外侧（${deg}° 半径 92px）不给方向`, (await pressPolar(deg, 92)) === '');
+  }
   // 偏离正方向 15°（<22.5°）仍算正方向：拇指按歪一点不该出斜向
-  check('偏上 15° 仍只给 UP', (await pressDir(0.26, -0.97)) === 'UP');
-  check('偏上 30° 出斜向', (await pressDir(0.5, -0.87)).split(' ').length === 2);
+  check('偏上 15° 仍只给 UP', (await pressPolar(-75, arcR)) === 'UP');
+  check('偏上 23°（出了扇区、又没按到弧）不给方向', (await pressPolar(-67, arcR)) === '');
   // 按下的反馈点亮的是那一片 SVG 形状（不是方的格子）：比较 UP 片与 DOWN 片的填充
   await page.mouse.move(pad.cx, pad.cy - pad.w * 0.36);
   await page.mouse.down();
@@ -203,6 +330,25 @@ async function clickItem(page, label) {
   await page.mouse.up();
   await page.waitForTimeout(150);
   check('按下的那一片整片亮起，没按的不亮', lit.up !== lit.down, `${lit.up} vs ${lit.down}`);
+  // 按弧的反馈：弧自己亮 + 相邻两片一起亮（看不出来按中了什么，就等于没反馈）
+  const a45 = (-45 * Math.PI) / 180;
+  await page.mouse.move(pad.cx + arcR * Math.cos(a45), pad.cy + arcR * Math.sin(a45));
+  await page.mouse.down();
+  await page.waitForTimeout(150);
+  const arcLit = await page.evaluate(() => {
+    const stroke = (sel) => getComputedStyle(document.querySelector(sel)).stroke;
+    const fill = (sel) => getComputedStyle(document.querySelector(sel)).fill;
+    return {
+      arcOn: stroke('.dpad-diag-up-right .dpad-diag-face'),
+      arcOff: stroke('.dpad-diag-left-up .dpad-diag-face'),
+      up: fill('.dpad-blade-up'), right: fill('.dpad-blade-right'), down: fill('.dpad-blade-down'),
+    };
+  });
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  check('按弧时那道弧自己也亮起', arcLit.arcOn !== arcLit.arcOff, `${arcLit.arcOn} vs ${arcLit.arcOff}`);
+  check('按弧时相邻两片一起亮，不相邻的不亮',
+    arcLit.up === arcLit.right && arcLit.up !== arcLit.down);
   check('正中心不给任何方向（死区）', (await pressDir(0, 0)) === '');
   // 死区边界钉在 8%：里面的空缝按了不给方向，画出来的那片尖头（离中心 11%）按得动
   check('死区内（离中心 5%）不给方向', (await pressDir(0, -1, 0.05)) === '');
@@ -223,6 +369,23 @@ async function clickItem(page, label) {
   check('起手按住 RIGHT', slideStart === 'RIGHT', slideStart);
   check('滑到下面换成 DOWN，RIGHT 同时释放', slideEnd === 'DOWN', slideEnd);
   check('松手干净', slideAfter === '', slideAfter);
+  // 沿那道圆滑过去：指针被容器捕获后 e.target 一直是容器，滑动中的换向只能靠现量位置重新命中。
+  // 这条就是钉住「滑到弧上真的会多出第二个方向」（判定为什么读 elementFromPoint 而不是 e.target）。
+  await page.mouse.move(pad.cx + arcR, pad.cy);
+  await page.mouse.down();
+  await page.waitForTimeout(60);
+  const onArm = await active();
+  await page.mouse.move(pad.cx + arcR * Math.cos(-45 * Math.PI / 180), pad.cy + arcR * Math.sin(-45 * Math.PI / 180), { steps: 8 });
+  await page.waitForTimeout(60);
+  const onArc = await active();
+  await page.mouse.move(pad.cx, pad.cy - arcR, { steps: 8 });
+  await page.waitForTimeout(60);
+  const onUp = await active();
+  await page.mouse.up();
+  await page.waitForTimeout(60);
+  check('沿圆滑到弧上：中途多出第二个方向（RIGHT → RIGHT+UP）',
+    onArm === 'RIGHT' && sorted(onArc) === 'RIGHT UP', `${onArm} → ${onArc}`);
+  check('滑过弧继续到 UP，斜向随之收掉', onUp === 'UP', onUp);
 
   console.log('\n【4. 两根手指同时按：取并集，松开一根还剩一根】');
   const multi = await page.evaluate(async ({ cx, cy, w }) => {
@@ -254,29 +417,40 @@ async function clickItem(page, label) {
   await openSection(page, '控制管理');
   await clickItem(page, '自由摆放按键');
   await page.waitForTimeout(400);
-  const editProbe = await page.evaluate(() => {
+  const editProbe = await page.evaluate(({ arcR }) => {
     const el = document.querySelector('.touch-dpad');
     const r = el.getBoundingClientRect();
-    // 探的是右上角（两臂之间）：那里只有命中层，正是「斜向」按点，
-    // 也是容器自己会不会被点中这件事唯一会被触发的位置。
-    const px = r.x + r.width * 0.92, py = r.y + r.height * 0.08;
-    const target = document.elementFromPoint(px, py);
-    target.dispatchEvent(new PointerEvent('pointerdown', {
-      bubbles: true, cancelable: true, pointerId: 31, clientX: px, clientY: py,
-    }));
-    const activeDuringDrag = el.dataset.active || '';
-    target.dispatchEvent(new PointerEvent('pointerup', {
-      bubbles: true, cancelable: true, pointerId: 31, clientX: px, clientY: py,
-    }));
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    /**
+     * 探两个点：弧键的命中带（斜向按点，它是 svg 里 pointer-events:stroke 的子元素，
+     * 摆放模式的拦截最容易漏掉它）和弧外面那道空白（只有整块命中层）。
+     * 容器自己会不会被点中，就靠这两处触发。
+     */
+    const probe = (px, py, id) => {
+      const target = document.elementFromPoint(px, py);
+      target.dispatchEvent(new PointerEvent('pointerdown', {
+        bubbles: true, cancelable: true, pointerId: id, clientX: px, clientY: py,
+      }));
+      const active = el.dataset.active || '';
+      target.dispatchEvent(new PointerEvent('pointerup', {
+        bubbles: true, cancelable: true, pointerId: id, clientX: px, clientY: py,
+      }));
+      // SVG 元素的 className 是个对象，取属性才拿得到 class 名
+      return { hitTag: `${target.getAttribute('class') || target.tagName}`, active };
+    };
+    const a45 = (-45 * Math.PI) / 180;
     return {
-      activeDuringDrag,
-      hitTag: `${target.className}`,
+      onArc: probe(cx + arcR * Math.cos(a45), cy + arcR * Math.sin(a45), 31),
+      outside: probe(r.x + r.width * 0.92, r.y + r.height * 0.08, 32),
       editing: document.querySelector('.stage').classList.contains('layout-edit'),
     };
-  });
+  }, { arcR });
   check('确认在摆放模式里', editProbe.editing === true);
-  check('按的是命中层而不是臂', /touch-dpad-hit/.test(editProbe.hitTag), editProbe.hitTag);
-  check('摆放模式下按十字不发方向', editProbe.activeDuringDrag === '', editProbe.activeDuringDrag);
+  check('探的第一个点确实是弧键的命中带', /dpad-diag-hit/.test(editProbe.onArc.hitTag), editProbe.onArc.hitTag);
+  check('探的第二个点是整块命中层（不是臂）', /touch-dpad-hit/.test(editProbe.outside.hitTag), editProbe.outside.hitTag);
+  check('摆放模式下按十字（含弧键）不发方向',
+    editProbe.onArc.active === '' && editProbe.outside.active === '',
+    `弧 ${editProbe.onArc.active || '无'} / 空白 ${editProbe.outside.active || '无'}`);
   await page.click('[data-editor="done"]');
   await page.waitForTimeout(300);
 
@@ -305,17 +479,25 @@ async function clickItem(page, label) {
   await page.keyboard.up('ArrowRight');
   await page.waitForTimeout(120);
   const afterKb = await held();
-  await page.mouse.move(pad.cx + pad.w * 0.36 * 0.707, pad.cy - pad.w * 0.36 * 0.707);
+  await page.mouse.move(pad.cx + arcR * Math.cos(-45 * Math.PI / 180), pad.cy + arcR * Math.sin(-45 * Math.PI / 180));
   await page.mouse.down();
   await page.waitForTimeout(120);
   const dpad = (await held()).join(',');
   await page.mouse.up();
   await page.waitForTimeout(120);
   const afterDpad = await held();
+  // 用户这次要的就是这条：拇指扫到弧和拨片之间那道空白，以前会当成斜向送进游戏。
+  await page.mouse.move(pad.cx + 40 * Math.cos(-45 * Math.PI / 180), pad.cy + 40 * Math.sin(-45 * Math.PI / 180));
+  await page.mouse.down();
+  await page.waitForTimeout(120);
+  const blankHeld = (await held()).join(',');
+  await page.mouse.up();
+  await page.waitForTimeout(120);
   check('一开始没有键是按住的', idle.length === 0, idle.join(','));
   check('键盘 上+右 两个键都送进了模拟器', kb === UP_RIGHT, kb);
-  check('十字键按右上也送出两个键', dpad === UP_RIGHT, dpad);
+  check('十字键按右上那道弧也送出两个键', dpad === UP_RIGHT, dpad);
   check('十字键斜向与键盘 上+右 完全一致', dpad === kb, `键盘 ${kb} / 手柄 ${dpad}`);
+  check('按弧和拨片之间的空白什么都不送（误触没了）', blankHeld === '', blankHeld);
   check('松开后回到空闲（键盘）', afterKb.length === 0, afterKb.join(','));
   check('松开后回到空闲（十字键）', afterDpad.length === 0, afterDpad.join(','));
 

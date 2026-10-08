@@ -259,8 +259,9 @@ const URL = 'http://localhost:7890/nes-console/';
       hasMenu: !!document.querySelector('.touch-menu'),
     };
   });
-  // 十字键 4 个臂 + 功能键 6 个（SELECT/START/X/Y/B/A）+ 簇心 AB = 11（MENU 已移到屏幕右上角）
-  check('触摸手柄有 11 个按键动作', touch.count === 11, `实际 ${touch.count}`);
+  // 十字键 4 个臂 + 4 段斜向弧键 + 功能键 6 个（SELECT/START/X/Y/B/A）+ 簇心 AB = 15
+  // （MENU 已移到屏幕右上角；弧键一段声明两个动作，但它是一段键，不是一个按键）
+  check('触摸手柄有 15 个动作声明', touch.count === 15, `实际 ${touch.count}`);
   check('每个按键都有动作声明', touch.actions.every((a) => !!a), touch.actions.join(','));
   check('有独立的菜单键', touch.hasMenu === true);
 

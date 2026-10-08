@@ -4,9 +4,11 @@ const { launch } = require('./lib-browser.cjs');
 
 const URL = 'http://localhost:7890/nes-console/';
 
-// 期望的动作集合：十字键 4 个 + 功能键 6 个（SELECT/START/X/Y/B/A）= 10
+// 期望的动作声明：十字键 4 个臂 + 功能键 6 个（SELECT/START/X/Y/B/A）+ 簇心 AB = 11 个
 // （MENU 已移到屏幕右上角；X/Y 是界面键，NES 游戏收不到，但照样是可按的手柄按钮）
 const EXPECTED_ACTIONS = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'A', 'B', 'X', 'Y', 'SELECT', 'START', 'A B'];
+// 斜向是外切圆上四段独立弧键，一段一次声明两个动作，不算「一个按键动作」
+const EXPECTED_DIAGS = ['UP RIGHT', 'RIGHT DOWN', 'DOWN LEFT', 'LEFT UP'];
 
 async function checkLayout(browser, name, viewport, isTouch) {
   const ctx = await browser.newContext({
@@ -22,12 +24,15 @@ async function checkLayout(browser, name, viewport, isTouch) {
   const info = await page.evaluate(() => {
     const box = document.getElementById('touch-controls');
     const style = getComputedStyle(box);
-    // 左手整块（十字键 + 下面的 SELECT/START）：位置、是否压画面、离底边多远都按这块量
+    // 左手整块（十字键 + 下面的 SELECT）：位置、是否压画面、离底边多远都按这块量
     const dpad = document.querySelector('.touch-dpad-group').getBoundingClientRect();
     // 「中心齐平」只量十字键本身，它才是和五键簇对中线的那一个
     const cross = document.querySelector('.touch-dpad').getBoundingClientRect();
-    const actions = document.querySelector('.touch-actions').getBoundingClientRect();
-    const btns = Array.from(document.querySelectorAll('#touch-controls [data-action]'));
+    // 右手整块（五键簇 + 下面的 START），和左手同构
+    const actions = document.querySelector('.touch-actions-group').getBoundingClientRect();
+    // 斜向那四段弧键也带 data-action，但它不是「一颗按钮」，单独列出来比
+    const all = Array.from(document.querySelectorAll('#touch-controls [data-action]'));
+    const btns = all.filter((b) => !b.closest('.dpad-diag'));
     // 「水平对齐」比的是十字键中心与 ABXY 四颗围出的正方形中心（簇心那颗 AB 就在正中）
     const abxy = ['x', 'y', 'b', 'a']
       .map((k) => document.querySelector(`.touch-${k}`).getBoundingClientRect());
@@ -46,6 +51,7 @@ async function checkLayout(browser, name, viewport, isTouch) {
       screenTop: screen.top,
       screenBottom: screen.bottom,
       declared: btns.map((b) => b.dataset.action),
+      diags: all.filter((b) => b.closest('.dpad-diag')).map((b) => b.dataset.action),
       bound: btns.filter((b) => !!b.dataset.action).length,
       // 加了一排 X/Y 后手柄变高，量一下是否还在视口内
       box: (() => {
@@ -61,9 +67,12 @@ async function checkLayout(browser, name, viewport, isTouch) {
   console.log(`   方向键中心Y=${Math.round(info.dpadMidY)} ABXY中心Y=${Math.round(info.abxyMidY)}`);
 
   const results = [];
-  results.push(['按键数量为 11', info.declared.length === 11]);
+  results.push(['按键数量为 11（不含四段斜向弧键）', info.declared.length === 11]);
   results.push(['动作声明完整', EXPECTED_ACTIONS.every((a) => info.declared.includes(a))]);
   results.push(['每个按键都有动作声明（含十字键四个臂）', info.bound === 11]);
+  results.push(['斜向是四段独立弧键，各声明两个动作',
+    info.diags.slice().sort().join('|') === EXPECTED_DIAGS.slice().sort().join('|'),
+    info.diags.join(' ')]);
   results.push(['手柄整体没超出视口',
     info.box.top >= 0 && info.box.bottom <= info.vh + 1 && info.box.left >= 0 && info.box.right <= info.vw + 1,
     `top=${Math.round(info.box.top)} bottom=${Math.round(info.box.bottom)}/${info.vh}`]);
