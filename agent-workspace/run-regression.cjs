@@ -35,6 +35,7 @@ const SCRIPTS = [
   'verify-ozone-colors.cjs',
   'verify-toast.cjs',
   'verify-touch-controls.cjs',
+  'verify-pad-size.cjs',
   'verify-dpad.cjs',
   'verify-input-reaches-core.cjs',
   'verify-touch-xy.cjs',

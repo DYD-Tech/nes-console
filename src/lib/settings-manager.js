@@ -31,6 +31,23 @@ export const PAD_MODES = [
   { value: 'never', label: '隐藏' },
 ];
 
+/**
+ * 虚拟手柄的三档大小。三档只是「一把尺子的长度」（CSS 的 --pad-u），
+ * 键径、间距、字号、描边全是它的倍数，所以换档是整块等比放大。
+ * small 是尺寸档位加进来之前手柄的实际尺寸。
+ * 窄竖屏会自动收小，再大两块就要撞上了 —— 封顶的推导见 global.css 的 .stage。
+ *
+ * 对标：RetroArch 的覆盖层大小是 `input_overlay_scale`（100%~400% 的连续值，
+ * 见其 cfg 模板）。这里有意收成三档：连续滑杆要在菜单里做「按住调」的交互，
+ * 而实际能用的区间很窄（再小按不准、再大两块相撞），三档点一下就够，
+ * 也让「窄屏自动收小」有一条明确的对照（哪档被收、收到多少都算得清）。
+ */
+export const PAD_SIZES = [
+  { value: 'small', label: '小（键径 48px）' },
+  { value: 'medium', label: '中（键径 57px）' },
+  { value: 'large', label: '大（键径 66px）' },
+];
+
 /** 可单独隐藏的按键组。方向键整组一起关：只留「上下」的十字键没有意义。 */
 export const PAD_GROUPS = [
   { id: 'dpad', label: '方向键' },
@@ -64,6 +81,8 @@ export const DEFAULT_SETTINGS = {
     // 动作 -> KeyboardEvent.code，空串表示该动作没绑键盘
     keyMap: { ...DEFAULT_BINDINGS },
     padMode: 'auto',
+    // 默认中档：小档是「按不动手指」的那一档，第一次上手就该拿到比它大一号的键
+    padSize: 'medium',
     padKeys: Object.fromEntries(PAD_GROUPS.map((g) => [g.id, true])),
     // 拖动偏移：相对 CSS 默认位置，按「占视口宽/高的比例」存，
     // 这样换设备、转屏后仍是同一个相对位置（存 px 会在别的分辨率上跑到屏外）

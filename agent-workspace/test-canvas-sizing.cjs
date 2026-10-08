@@ -53,6 +53,9 @@ const { launch } = require('./lib-browser.cjs');
         maxGroupW: +maxGroupW.toFixed(1),
         target: [+tw.toFixed(1), +th.toFixed(1)],
         vw: innerWidth, vh: innerHeight,
+        // 手柄轨道的左右内边距 = 1 把尺子（--pad-u，见 global.css 的 .stage）：
+        // 三档大小一改它就从 16 变成 19/22，所以当场量，不写死。
+        padU: +getComputedStyle(document.getElementById('touch-controls')).paddingLeft.replace('px',''),
         overlapArea,
         screenArea: scr.width * scr.height,
         scrollW: doc.scrollWidth, clientW: doc.clientWidth,
@@ -72,7 +75,7 @@ const { launch } = require('./lib-browser.cjs');
     //   横屏但两侧余量比一块按键组还窄（如 667x375：单侧 83px，组宽 132px）。
     // 手柄这时必然压到画面边缘，用户可以在「控制管理」里隐藏或重新摆放。
     const freeH = r.vh - r.target[1];
-    const freeSide = (r.vw - r.target[0]) / 2 - 16; // 减去 #touch-controls 的 1rem 内边距
+    const freeSide = (r.vw - r.target[0]) / 2 - r.padU; // 减去 #touch-controls 的左右内边距（1 把尺子）
     const sideMode = aspect > 8 / 5;
     const tooNarrow = sideMode && freeSide < r.maxGroupW;
     const mode = sideMode ? (tooNarrow ? '左右余量不足' : '左右余量')

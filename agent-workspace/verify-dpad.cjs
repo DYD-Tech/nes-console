@@ -97,6 +97,9 @@ async function clickItem(page, label) {
     });
     return {
       pad, hit, arms, diags, bladeOuterR,
+      // 尺子本身：#touch-controls 的 padding 就是 1 个 u（见 global.css），
+      // 三档大小只改这个值，所以下面所有「px 门槛」都要写成 u 的倍数才站得住。
+      u: parseFloat(getComputedStyle(document.getElementById('touch-controls')).paddingLeft),
       diagCount: document.querySelectorAll('.dpad-diag').length,
       diagFaceStroke: parseFloat(getComputedStyle(document.querySelector('.dpad-diag-face')).strokeWidth) * perUnit,
       diagHitStroke: hitHalfPx * 2,
@@ -139,7 +142,7 @@ async function clickItem(page, label) {
   });
   check('十字键容器是正方形', geo.square, `${geo.pad.w.toFixed(0)}x${geo.pad.h.toFixed(0)}`);
   check('命中层铺满整块十字（按在四角空白也收得到按下，只是不给方向）', geo.hitCoversPad);
-  check('四个臂各占一格且不小于 44px',
+  check('四个臂各占一格且不小于 44px（触摸目标下限）',
     geo.arms.length === 4 && geo.arms.every((a) => a.w >= 44 && a.h >= 44),
     geo.arms.map((a) => `${a.action}=${a.w.toFixed(0)}x${a.h.toFixed(0)}`).join(' '));
   check('四个臂方位正确（上格在上、右格在右…）',
@@ -155,22 +158,29 @@ async function clickItem(page, label) {
   check('斜向是四段独立弧键，一段管两个方向',
     geo.diagCount === 4 && geo.diags.every((d) => d.action.split(' ').length === 2),
     geo.diags.map((d) => d.action).join(' | '));
+  // 采样有误差，容差按尺子给（0.1u：小档 1.6px，和原来写死的 1.5px 基本同宽）。
   check('四段弧同半径，且就落在拨片外缘那道圆上（外切圆）',
     geo.diags.every((d) => Math.abs(d.rMax - d.rMin) < 0.5
-      && Math.abs(d.rMin - geo.bladeOuterR) <= 1.5),
+      && Math.abs(d.rMin - geo.bladeOuterR) <= 0.1 * geo.u),
     `弧 ${geo.diags[0].rMin.toFixed(2)}~${geo.diags[0].rMax.toFixed(2)}px / 拨片外缘 ${geo.bladeOuterR.toFixed(2)}px`);
+  // 空隙 = 0.25u（小档 4px）：形状都在 viewBox 单位里，换档位是等比放大，
+  // 所以这道空隙也必须按 u 判，写死 4px 会在大档上误判成「又糊回去了」。
   check('弧和拨片之间留着空隙（没有连回去）',
-    geo.diags.every((d) => d.gap >= 4),
-    `最近 ${Math.min(...geo.diags.map((d) => d.gap)).toFixed(1)}px`);
-  check('弧很细（可见不到 5px），但命中带粗到按得住（≥14px）',
-    geo.diagFaceStroke <= 5 && geo.diagHitStroke >= 14 && geo.diagHitPE === 'stroke',
+    geo.diags.every((d) => d.gap >= 0.25 * geo.u),
+    `最近 ${Math.min(...geo.diags.map((d) => d.gap)).toFixed(1)}px / 门槛 ${(0.25 * geo.u).toFixed(1)}px`);
+  // 可见弧 0.25u、命中带 1.06u（见 global.css 的 .dpad-diag-face）；
+  // 下限 14px 是「拇指按得住」的绝对量，三档都该满足，所以这条保留。
+  check('弧很细（可见 ≤0.32u），但命中带粗到按得住（≥0.85u 且 ≥14px）',
+    geo.diagFaceStroke <= 0.32 * geo.u && geo.diagHitStroke >= 0.85 * geo.u
+      && geo.diagHitStroke >= 14 && geo.diagHitPE === 'stroke',
     `可见 ${geo.diagFaceStroke.toFixed(2)}px / 命中 ${geo.diagHitStroke.toFixed(2)}px / ${geo.diagHitPE}`);
   check('弧的命中带不出格子（不会压到旁边的键）',
     geo.diags.every((d) => d.reach <= geo.pad.w / 2),
     `最外 ${Math.max(...geo.diags.map((d) => d.reach)).toFixed(1)}px / 半格 ${geo.pad.w / 2}px`);
-  check('弧长短合适：看得见（≥18px，含圆头）、又没长到快贴上拨片（≤28px）',
-    geo.diags.every((d) => d.len >= 18 && d.len <= 28),
-    geo.diags.map((d) => d.len.toFixed(1)).join(' '));
+  // 弧长 = 1.4u（含两端圆头），比例区间对应原来的 18~28px（u=16 → 1.125u~1.75u）。
+  check('弧长短合适：看得见、又没长到快贴上拨片（1.25u~1.55u）',
+    geo.diags.every((d) => d.len / geo.u >= 1.25 && d.len / geo.u <= 1.55),
+    geo.diags.map((d) => `${d.len.toFixed(1)}px=${(d.len / geo.u).toFixed(2)}u`).join(' '));
   check('容器不吃事件，命中交给子元素（摆放模式拦截依赖这条）',
     geo.padPointerEvents === 'none' && geo.hitPointerEvents === 'auto',
     `${geo.padPointerEvents}/${geo.hitPointerEvents}`);
@@ -288,6 +298,9 @@ async function clickItem(page, label) {
   };
   // 半径用实测值（弧就画在拨片外缘那道圆上）：格子尺寸一改，写死的数字会按到空白上。
   const arcR = (geo.diags[0].rMin + geo.diags[0].rMax) / 2;
+  // 弧内/弧外那两道空白按格子比例取（原写死的 40px / 92px 就是格子 132px 时的 0.30 / 0.70 倍）
+  const rIn = pad.w * 0.3;
+  const rOut = pad.w * 0.7;
   /** 按住「离中心 r 像素、方向 deg 度（屏幕坐标：0=右，负角朝上）」那个点 */
   const pressPolar = async (deg, r) => {
     const a = (deg * Math.PI) / 180;
@@ -313,8 +326,8 @@ async function clickItem(page, label) {
   // 这次改的目的就在这里：拇指常扫到弧和拨片之间、以及弧外面那些空白，
   // 以前那里算斜向，误触比漏按难查得多。现在按了没反应才是对的。
   for (const deg of [-45, 45]) {
-    check(`斜角空白·弧内侧（${deg}° 半径 40px）不给方向`, (await pressPolar(deg, 40)) === '');
-    check(`斜角空白·弧外侧（${deg}° 半径 92px）不给方向`, (await pressPolar(deg, 92)) === '');
+    check(`斜角空白·弧内侧（${deg}° 半径 ${Math.round(rIn)}px）不给方向`, (await pressPolar(deg, rIn)) === '');
+    check(`斜角空白·弧外侧（${deg}° 半径 ${Math.round(rOut)}px）不给方向`, (await pressPolar(deg, rOut)) === '');
   }
   // 偏离正方向 15°（<22.5°）仍算正方向：拇指按歪一点不该出斜向
   check('偏上 15° 仍只给 UP', (await pressPolar(-75, arcR)) === 'UP');
@@ -487,7 +500,7 @@ async function clickItem(page, label) {
   await page.waitForTimeout(120);
   const afterDpad = await held();
   // 用户这次要的就是这条：拇指扫到弧和拨片之间那道空白，以前会当成斜向送进游戏。
-  await page.mouse.move(pad.cx + 40 * Math.cos(-45 * Math.PI / 180), pad.cy + 40 * Math.sin(-45 * Math.PI / 180));
+  await page.mouse.move(pad.cx + rIn * Math.cos(-45 * Math.PI / 180), pad.cy + rIn * Math.sin(-45 * Math.PI / 180));
   await page.mouse.down();
   await page.waitForTimeout(120);
   const blankHeld = (await held()).join(',');

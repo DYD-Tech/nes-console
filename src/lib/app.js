@@ -19,7 +19,7 @@ import { NesConsole, BUTTON } from './nes/console.js';
 import { InputManager, ACTIONS, DEFAULT_BINDINGS, formatKeyCode } from './input-manager.js';
 import { ScreenUI } from './screen-ui.js';
 import { GameManager } from './game-manager.js';
-import { SettingsManager, SETTINGS_SCHEMA, DEFAULT_SETTINGS, PAD_MODES, PAD_GROUPS } from './settings-manager.js';
+import { SettingsManager, SETTINGS_SCHEMA, DEFAULT_SETTINGS, PAD_MODES, PAD_SIZES, PAD_GROUPS } from './settings-manager.js';
 import { TouchLayout } from './touch-layout.js';
 import {
   SLOTS, SLOT_LABELS, saveState, loadState, deleteState, getSaveStates,
@@ -284,6 +284,13 @@ function buildMainMenu() {
             onSelect: () => cyclePadMode(),
           },
           {
+            id: 'pad-size',
+            label: '按键大小',
+            sublabel: '整块手柄一起放大，窄屏会自动收小',
+            value: padSizeLabel(settings.getValue('controls.padSize')),
+            onSelect: () => cyclePadSize(),
+          },
+          {
             id: 'pad-keys',
             label: '手柄按键显隐',
             sublabel: '只留下你要用的那几个键',
@@ -482,6 +489,7 @@ function applySetting(path, value) {
       break;
     case 'controls.padMode':
     case 'controls.padKeys':
+    case 'controls.padSize':
       layout.apply();
       break;
     case 'controls.padLayout':
@@ -609,6 +617,12 @@ function padModeLabel(mode) {
   return found ? found.label : PAD_MODES[0].label;
 }
 
+function padSizeLabel(size) {
+  const found = PAD_SIZES.find((s) => s.value === size);
+  // 认不出来的值按小档念：CSS 里没有对应规则时也就是小档（--pad-u-base 的默认值）
+  return found ? found.label : PAD_SIZES[0].label;
+}
+
 /** 三档循环切换（自动 → 始终 → 隐藏 → 自动），和设置里 toggle 的按 A 循环一致 */
 function cyclePadMode() {
   const cur = settings.getValue('controls.padMode');
@@ -616,6 +630,15 @@ function cyclePadMode() {
   const next = PAD_MODES[(i + 1) % PAD_MODES.length].value;
   settings.setValue('controls.padMode', next);
   showToast(`虚拟手柄：${padModeLabel(next)}`);
+}
+
+/** 三档循环切换（小 → 中 → 大 → 小）。整块手柄一起放大，不是只放大某几颗键。 */
+function cyclePadSize() {
+  const cur = settings.getValue('controls.padSize');
+  const i = PAD_SIZES.findIndex((s) => s.value === cur);
+  const next = PAD_SIZES[(i + 1) % PAD_SIZES.length].value;
+  settings.setValue('controls.padSize', next);
+  showToast(`按键大小：${padSizeLabel(next)}`);
 }
 
 function buildPadKeysMenu() {

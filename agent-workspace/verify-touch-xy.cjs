@@ -129,12 +129,24 @@ const check = (label, ok, actual) => {
   const entered = await snap();
   check('按手柄 → 从分类栏进到游戏列表', entered.focus === 'list' && entered.selected !== '',
     `focus=${entered.focus} 选中="${entered.selected}"`);
-  await tap('.touch-a', 1800);
+  // 等「真在跑」，不是等固定 1800ms：核心首次实例化要编译 800 KB wasm，全量连跑时
+  // 那一下不一定够。没等到位就按 MENU，那一刻 playing 还是 false，开出来的是**主菜单**，
+  // 后面一串「用十字键走存档管理」就全走岔了（单跑全绿、连跑红九条就是这么来的）。
+  // 门槛用「比按下前又多跑 30 帧」，理由同 lib-game-menu.cjs 的 startGame。
+  const framesBefore = await page.evaluate(() => window.__nesConsole.host.frames);
+  await tap('.touch-a', 200);
+  let booted = true;
+  try {
+    await page.waitForFunction(([base]) =>
+      document.querySelector('.sys-ui').hidden && window.__nesConsole.host.frames >= base + 30,
+    [framesBefore], { timeout: 30000 });
+  } catch { booted = false; }
   const running = await snap();
-  check('点 A 启动了游戏（菜单关掉）', running.hidden === true, running.status);
+  check('点 A 启动了游戏（菜单关掉、确实在跑帧）', booted && running.hidden === true, running.status);
   await openQuickMenu();
   const quick = await snap();
-  check('屏幕内菜单开着（有条目）', quick.labels.length > 0, quick.labels.slice(0, 6).join(' / '));
+  check('屏幕内菜单开着（是游戏里的快速菜单，不是主菜单）',
+    quick.labels.includes('继续游戏'), quick.labels.slice(0, 6).join(' / '));
   await tap('.touch-b');
   check('在快速菜单里点 B 关掉菜单回到游戏', (await snap()).hidden === true);
 

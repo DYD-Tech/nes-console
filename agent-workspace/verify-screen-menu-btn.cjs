@@ -170,7 +170,9 @@ const contrastOf = (page, sel, opacityFrom = sel) => page.evaluate(([s, oSel]) =
     // 这里刻意不跟手柄的 --pad-* 走：手柄按键压在近黑的页面底上，这两颗压在**游戏画面**上，
     // 底下什么颜色都有可能，半透明浅灰描边压在亮画面上就和画面一个色 —— 按钮整个消失。
     // 所以验的是「深浅两种画面下都分得出来」（WCAG 2.2 SC 1.4.11 非文本对比 ≥3:1），
-    // 而不是「和 A 键一个色」。粗细/字重这些不成问题的仍然对齐 A 键。
+    // 而不是「和 A 键一个色」。字重这类不成问题的仍对齐 A 键；
+    // 描边粗细从手柄改三档大小起就**不再跟 A 键比**了 —— A 键那条随档位放大（3/4px），
+    // 这两颗是界面控件，恒用 :root 的 3px（见 global.css 的 .screen .touch-menu）。
     const style = await page.evaluate(() => {
       const cs = (sel) => getComputedStyle(document.querySelector(sel));
       const m = cs('.touch-menu'), a = cs('.touch-a');
@@ -197,7 +199,9 @@ const contrastOf = (page, sel, opacityFrom = sel) => page.evaluate(([s, oSel]) =
       Math.abs(style.radius - style.w * (0.35 / 2.35)) <= 0.1,
       `radius=${style.radius} 边长=${style.w}`);
     check('宽高相等', Math.abs(style.w - style.h) < 0.5, `${style.w}x${style.h}`);
-    check('描边粗细与 A 键一致', style.bw === style.abw, `${style.bw} vs ${style.abw}`);
+    // 钉死 3px，而不是「和 A 键一样」：A 键那条是手柄尺子的倍数，三档下是 3/3/4px。
+    check('描边恒为 3px（不随手柄档位放大）',
+      style.bw === '3px', `${style.bw}（A 键同期为 ${style.abw}，不参与缩放）`);
     check('字重与 A 键一致', style.fw === style.afw, `${style.fw} vs ${style.afw}`);
     check('是内圈描边（box-shadow inset），不是只有一条 border',
       /inset/.test(style.ringIn) && style.ringIn !== 'none', `box-shadow=${style.ringIn}`);

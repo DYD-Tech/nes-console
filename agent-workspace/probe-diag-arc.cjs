@@ -94,7 +94,9 @@ const SETTINGS_KEY = 'nes-console.settings';
       hitPE: cs('.dpad-diag-hit').pointerEvents,
       facePE: cs('.dpad-diag-face').pointerEvents,
       svgPE: cs('svg.touch-dpad-face').pointerEvents,
-      scan: [40, 56, 60, 64.5, 70, 73, 80, 92].map((r) => ({ r, hit: scan(r) })),
+      // 扫描点按格子宽的比例给（括号里是小档实测的那几个 px）：写死 px，换档位就扫到别处去了
+      scan: [0.303, 0.424, 0.455, 0.489, 0.53, 0.553, 0.606, 0.697]
+        .map((f) => ({ r: +(f * pad.width).toFixed(1), hit: scan(f * pad.width) })),
       outerHitR: outer,
       diagGroups: document.querySelectorAll('.dpad-diag').length,
       uses: document.querySelectorAll('svg.touch-dpad-face > use').length,
@@ -130,16 +132,18 @@ const SETTINGS_KEY = 'nes-console.settings';
   };
 
   console.log('\n【2. 判定】');
+  // 弧的半径取实测中点，空白点按格子宽的比例给（同上一节）
+  const ARC_R = (geo.arcs[0].rMin + geo.arcs[0].rMax) / 2;
   for (const deg of [-45, 45, 135, -135]) {
-    print(`按弧 ${deg}° r=64.5`, `"${await pressPolar(deg, 64.5)}"`);
+    print(`按弧 ${deg}° r=${ARC_R.toFixed(1)}`, `"${await pressPolar(deg, ARC_R)}"`);
   }
   for (const deg of [-45, 45]) {
-    print(`斜角空白（弧内侧）${deg}° r=40`, `"${await pressPolar(deg, 40)}"`);
-    print(`斜角空白（弧外侧）${deg}° r=92`, `"${await pressPolar(deg, 92)}"`);
+    print(`斜角空白（弧内侧）${deg}° r=${(geo.pad.w * 0.303).toFixed(1)}`, `"${await pressPolar(deg, geo.pad.w * 0.303)}"`);
+    print(`斜角空白（弧外侧）${deg}° r=${(geo.pad.w * 0.697).toFixed(1)}`, `"${await pressPolar(deg, geo.pad.w * 0.697)}"`);
   }
-  print('正上 r=64.5', `"${await pressPolar(-90, 64.5)}"`);
-  print('偏上 15° r=64.5（扇区内）', `"${await pressPolar(-75, 64.5)}"`);
-  print('偏上 23° r=64.5（出扇区、不在弧上）', `"${await pressPolar(-67, 64.5)}"`);
+  print(`正上 r=${ARC_R.toFixed(1)}`, `"${await pressPolar(-90, ARC_R)}"`);
+  print(`偏上 15° r=${ARC_R.toFixed(1)}（扇区内）`, `"${await pressPolar(-75, ARC_R)}"`);
+  print(`偏上 23° r=${ARC_R.toFixed(1)}（出扇区、不在弧上）`, `"${await pressPolar(-67, ARC_R)}"`);
 
   console.log('\n【3. 截图】agent-workspace/probe/diag-*.png');
   const clip = {
@@ -148,7 +152,7 @@ const SETTINGS_KEY = 'nes-console.settings';
   };
   await page.screenshot({ path: 'agent-workspace/probe/diag-idle.png', clip });
   const a = (-45 * Math.PI) / 180;
-  await page.mouse.move(geo.pad.cx + 64.5 * Math.cos(a), geo.pad.cy + 64.5 * Math.sin(a));
+  await page.mouse.move(geo.pad.cx + ARC_R * Math.cos(a), geo.pad.cy + ARC_R * Math.sin(a));
   await page.mouse.down();
   await page.waitForTimeout(160);
   await page.screenshot({ path: 'agent-workspace/probe/diag-press.png', clip });

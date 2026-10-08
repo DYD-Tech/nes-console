@@ -1,8 +1,8 @@
 /**
  * 虚拟手柄的显隐与摆放
  *
- * 管三件事：整块手柄在哪些设备上显示（padMode）、哪些按键组露出来（padKeys）、
- * 两组按键摆在哪儿（padLayout）。都只碰 DOM 和 CSS、不碰输入派发，所以独立成模块：
+ * 管四件事：整块手柄在哪些设备上显示（padMode）、多大（padSize）、哪些按键组露出来
+ * （padKeys）、两组按键摆在哪儿（padLayout）。都只碰 DOM 和 CSS、不碰输入派发，所以独立成模块：
  * 设置值进来，界面状态出去，启动时和每次改动后都走同一个 apply()。
  *
  * 摆放模式的四条取舍：
@@ -82,11 +82,12 @@ export class TouchLayout {
     }
   }
 
-  /** 按当前设置应用显隐 + 位置。启动时和每次设置变更后都调它。 */
+  /** 按当前设置应用显隐 + 大小 + 位置。启动时和每次设置变更后都调它。 */
   apply() {
     const c = this.getSettings();
     this._applyMode(c.padMode);
     this._applyKeys(c.padKeys);
+    this._applySize(c.padSize);
     this.applyLayout();
   }
 
@@ -174,6 +175,16 @@ export class TouchLayout {
   _applyMode(mode) {
     this.stage.classList.toggle('pad-always', mode === 'always');
     this.stage.classList.toggle('pad-never', mode === 'never');
+  }
+
+  /**
+   * 大小档位：这里只写一个 data 属性，三档各是多少 px、窄屏怎么封顶都在 CSS 里
+   * （.stage 的 --pad-u / --pad-u-base）。
+   * 小档也照写：属性记的是「用户选了哪档」，而小档就是 CSS 的默认值，写不写尺寸都一样。
+   * 值不在三档里（比如设置被手改坏）时没有规则匹配，自然落回小档，不用在这里加校验。
+   */
+  _applySize(size) {
+    this.stage.dataset.padSize = size;
   }
 
   _applyKeys(padKeys) {
