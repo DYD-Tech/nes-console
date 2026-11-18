@@ -1,6 +1,7 @@
 # NES Console
 
-浏览器里的 NES（红白机 / FC）模拟器。纯静态站点，没有后端：模拟核心用 libretro 生态的
+浏览器里的 NES（红白机 / FC）模拟器。纯静态站点，没有后端，**也不需要构建**：
+`web/` 目录就是网站本身，任何静态文件服务器直接就能跑。模拟核心用 libretro 生态的
 **fceumm**，编译成 WebAssembly 在浏览器里跑，外面套一层自研的薄 libretro 宿主
 （只实现视频、音频、按键、存档、环境变量这几样 libretro 规定的接口，不含 NES 逻辑）。
 
@@ -31,18 +32,27 @@
 - **按键映射可改**：13 个动作逐个改绑键盘按键，存 localStorage
 - **加自己的游戏**：把 `.nes` 拖到页面任意位置，或走「游戏管理 → 加入游戏」。
   这条路存进浏览器 IndexedDB，只在这台设备可见，不占站点体积
-- **内置游戏库**：把 `.nes` 放进 `public/rom/`，构建时自动扫进游戏列表并标为「内置」
+- **内置演示卡带**：清单 `web/games.json` 里列的游戏（目前一款），在列表里标为「内置」
 - **AudioWorklet 音频**：实时线程消费，跑帧侧按队列深度微调速度，音画不漂
 - **画面自适应**：任何分辨率下都取该视口内能放下的最大 4:3 矩形，界面不额外吃掉画面高度
 
 ## 快速开始
 
+不需要 `npm install`，也不需要构建。把 `web/` 目录交给任何一个静态文件服务器就能玩：
+
 ```bash
-npm install
-npm run dev            # http://localhost:4321/nes-console/
+python -m http.server -d web 8000     # 打开 http://localhost:8000/
+npx serve web                         # 或者用 Node 生态的 serve
+npm run serve                         # 仓库自带的零依赖服务器：http://localhost:7890/nes-console/（测试脚本打的就是它）
 ```
 
-核心的 wasm 产物（`public/cores/`）随仓库发布，日常开发不需要重编、也不需要 emsdk。
+**不能直接双击 `index.html` 用 `file://` 打开**：浏览器不允许本地文件加载 JS 模块、
+wasm 和音频线程（AudioWorklet），页面会白屏或没声音。一定要经过一个 http 服务器。
+另外声音需要「安全上下文」：`localhost` 或 `https` 才有声音，用局域网 IP（`http://192.168.x.x`）访问会静音运行。
+
+页面里所有资源都用相对路径，所以站点放在根目录还是子目录（比如 GitHub Pages 的 `/nes-console/`）都不用改配置。
+
+核心的 wasm 产物（`web/cores/`）随仓库发布，日常开发不需要重编、也不需要 emsdk。
 只有换核心版本时才编一次：
 
 ```bash
@@ -52,25 +62,19 @@ EMSDK_DIR=/path/to/emsdk npm run build:core
 
 ### 加游戏
 
-构建时扫 `public/rom/*.nes` 生成清单 `public/games.json`，前端只读这份清单
-（浏览器列不了服务器目录，这件事只能在构建时数一遍）。所以：
-
-- 想让它成为**站点的内置游戏**：把 `.nes` 丢进 `public/rom/`，重新 `npm run dev` 或 `npm run build`。
+- 只想**自己玩**：把文件拖进页面，或走「游戏管理 → 加入游戏」。ROM 存在浏览器的 IndexedDB 里，
+  只在这台设备可见，不上传、不占站点体积。这是站点的主要用法。
+- 想让它成为**站点的内置游戏**（很少需要）：`.nes` 放进 `web/rom/`，再在 `web/games.json` 里加一条
+  （要写这份 ROM 的内容哈希，算法和一行命令见 [`doc/游戏库与存档.md`](doc/游戏库与存档.md)）。
+  浏览器没法列出服务器上的目录，所以内置游戏只能靠这份清单告诉页面。
   放进这个目录即随站点分发，请只放你有权分发的卡带（自制、公有领域，或已获授权）。
-- 只想**自己玩**：把文件拖进页面，或走「游戏管理 → 加入游戏」。
 
 仓库默认带一张能跑的演示卡带，克隆下来就能试玩，不用先去找 ROM。
-换成别的：改 `.gitignore` 里 `!public/rom/…` 那行放行的文件名，重新构建。
 
-### 构建与部署
+### 部署
 
-```bash
-npm run build                            # 产物在 dist/，纯静态，任何静态托管都能放
-npx astro preview --port 7890 --host     # 本地起构建产物（测试脚本打的就是这个地址）
-```
-
-站点挂在 `/nes-console/` 这个 base 下（`astro.config.mjs`），换托管路径时要一起改。
-仓库配了 GitHub Actions：推到 `main` 自动构建并发布到 GitHub Pages。
+仓库配了 GitHub Actions（`.github/workflows/deploy.yml`）：推到 `main` 就把 `web/` 目录原样发布到 GitHub Pages，
+不装 Node、不跑任何构建。放到别的静态托管也一样：上传 `web/` 里的全部文件即可。
 
 ## 操作
 
@@ -99,8 +103,12 @@ X/Y 送不进游戏；而且不是所有手柄都有 X/Y，功能绑上去就等
 ## 项目结构
 
 ```
-src/
-├── lib/
+web/                         网站本身（原样发布，不经构建）
+├── index.html               页面骨架
+├── css/
+│   ├── reset.css            基础样式重置（Tailwind Preflight 原文，当第三方代码看待）
+│   └── global.css           布局 + 屏幕内界面样式
+├── js/                      浏览器原生 ES 模块，index.html 只引 app.js
 │   ├── app.js               接线 + 菜单内容定义（入口）
 │   ├── nes/                 模拟器这一侧（换核心只动这个目录）
 │   │   ├── console.js       门面：界面只认它（载 ROM、存/读档、按键、生命周期）
@@ -113,15 +121,12 @@ src/
 │   ├── game-manager.js      游戏列表与加载
 │   ├── settings-manager.js  设置读写（localStorage）
 │   └── storage.js           存档、电池 RAM、ROM 落盘（IndexedDB，三张表）
-├── integrations/
-│   └── rom-catalog.js       构建时扫 public/rom/ 生成 public/games.json
-├── pages/index.astro        页面骨架
-└── styles/global.css        布局 + 屏幕内界面样式
-public/
-├── rom/                     内置 ROM 的投放目录（.nes 丢进来就进列表）
 ├── cores/                   fceumm 的 wasm 产物 + build.json（记下是哪份源码编的）
-└── games.json               上面那个集成生成的清单（构建产物，不入库）
+├── rom/                     内置 ROM（只入库一张演示卡带）
+├── games.json               内置游戏清单（手写入库，带每款的内容哈希）
+└── favicon.svg
 scripts/
+├── serve.cjs                零依赖静态服务器，把 web/ 挂到 7890（npm run serve）
 └── build-core.cjs           emsdk 编核心（npm run build:core）
 third_party/
 └── libretro-fceumm/         核心源码（GPL-2.0，带上游 commit 记录）
@@ -132,15 +137,15 @@ doc/                         实现文档，见下面「文档」
 ## 测试
 
 ```bash
-npm run test:fast                              # 快档：3 条脚本 225 条断言，约 1 秒，不用构建、不用起站点
-npm run build && npx astro preview --port 7890 --host   # 浏览器脚本跑在构建产物上
+npm run test:fast                              # 快档：3 条脚本 225 条断言，约 1 秒，不用起站点
+npm run serve                                  # 浏览器脚本打 http://localhost:7890/nes-console/，先把站点起着
 node agent-workspace/run-regression.cjs        # 全量：25 条约 1000 条断言，约 6 分钟，汇总带每条耗时
 node agent-workspace/run-regression.cjs wasm   # 参数是脚本名关键字，只跑相关的几条
 ```
 
 **改哪处该测到什么程度、每条脚本测什么、已知的环境假失败，都在
 [`doc/测试方案.md`](doc/测试方案.md)。** 一句话原则：改样子看样子，改规则测规则，
-碰共享的东西才跑全量。跑浏览器脚本还需要一个 Chromium：`npx playwright install chromium`。
+碰共享的东西才跑全量。跑测试要先 `npm install`（只装 playwright 一个开发依赖），浏览器脚本还需要一个 Chromium：`npx playwright install chromium`。
 
 ## 文档
 
@@ -149,16 +154,15 @@ node agent-workspace/run-regression.cjs wasm   # 参数是脚本名关键字，�
 | [`doc/模拟器核心与宿主.md`](doc/模拟器核心与宿主.md) | 为什么是 fceumm + 自研宿主；libretro 接线的几条硬约束；AudioWorklet 音频；与 RetroArch 的存档互通 |
 | [`doc/界面与交互.md`](doc/界面与交互.md) | 画面最大化的布局推导、Ozone 配色、菜单焦点模型、菜单暂停、常驻按钮与顶栏排布、提示、长按抑制 |
 | [`doc/控制与手柄.md`](doc/控制与手柄.md) | 按键映射的数据模型、虚拟手柄显隐与三档大小、十字方向键的扇区判定、自由摆放 |
-| [`doc/游戏库与存档.md`](doc/游戏库与存档.md) | 构建时扫目录的链路、IndexedDB 三张表、即时存档与电池 RAM 的分工 |
+| [`doc/游戏库与存档.md`](doc/游戏库与存档.md) | 内置游戏清单怎么写、IndexedDB 三张表、即时存档与电池 RAM 的分工 |
 | [`doc/测试方案.md`](doc/测试方案.md) | 测试分档、脚本清单与耗时、环境前置 |
 | [`doc/color.md`](doc/color.md) | 色板数值（屏幕内 Ozone / 屏幕外石墨 + 强调青）与对比度实测 |
 | [`doc/值得记住的坑/nes-console.md`](doc/值得记住的坑/nes-console.md) | 踩坑记录，每条「现象 → 原因 → 做法」 |
 
 ## 技术栈
 
-- **Astro 5** — 静态站点生成
-- **Tailwind CSS 3** — 样式
-- **fceumm（libretro 核心）→ WebAssembly** — NES 模拟核心，源码在 `third_party/`，产物在 `public/cores/`
+- **原生 HTML + CSS + ES 模块** — 不用框架、不打包、不构建，浏览器直接读源码
+- **fceumm（libretro 核心）→ WebAssembly** — NES 模拟核心，源码在 `third_party/`，产物在 `web/cores/`
 - **自研薄 libretro 宿主** — 没有用现成的整套前端（EmulatorJS / Nostalgist），理由见
   [`doc/模拟器核心与宿主.md`](doc/模拟器核心与宿主.md)
 

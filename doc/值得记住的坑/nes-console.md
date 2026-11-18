@@ -148,7 +148,7 @@
 ## jsnes 的 reset() 会崩，且库自带 stop() 缺陷
 
 > jsnes 已于 2026-10-05 换成自研的 fceumm wasm 宿主；本文里凡是**标题以 jsnes 开头**的小节
-> 都属于退役内核时期（共四条，中间夹的「模拟器主循环…」「Astro…」不在其列）。
+> 都属于退役内核时期（共四条，中间夹的「模拟器主循环…」不在其列）。
 > 留着是因为可迁移的是规则而不是补丁：**接手一个库先读它的异常与重置路径**，
 > 崩溃分支本身可能有 bug；「重置」必须是完整的重新加载，不能只清零状态。
 
@@ -204,19 +204,6 @@ Emscripten 抛出的 JS 异常），异常打断 `requestAnimationFrame` 循环�
 **做法**：把非法操作码写到 `cpu.mem[0x8001]`（PC 指向 0x8000），
 并直接调 `cpu.emulate()` 绕开 NMI，才能稳定复现。有效操作码见 `opdata`：
 `0xff` 表示无效（如 `0x02`）。
-
-## Astro 里客户端脚本的正确写法
-
-**现象**：`<script>` 里的 `import` 不生效，所有按钮点击无反应，且没有任何报错。
-
-**原因**：写成内联 `<script>`（无 `src`）时，Astro 会把模块内联回 HTML，
-但浏览器规范不允许内联 module script 使用 `import`，整个脚本静默失效。
-另外 `public/` 下的 JS 不经过 Astro 处理，里面的 `import` 也会 404。
-
-**做法**：客户端代码写在 `.astro` 的 `<script>` 标签里（不加 `type="module"`，
-Astro 会自己处理），由 Astro 打包成带 hash 的外部文件并自动注入
-`<script type="module" src="...">`。构建后要确认 HTML 里是外部引用、且
-`dist/_astro/*.js` 确实生成了。
 
 ## jsnes 的导入写法取决于版本，报错误导人
 
@@ -630,8 +617,8 @@ jsnes 1.2.1 的 `toJSON()` 只写 `romData/cpu/mmap/ppu`（unpkg jsnes@1.2.1/src
 于是「没跑过的游戏」= 「没存档」，把两个完全不同的概念划了等号。
 
 **做法**：**按内容寻址的数据，地址要在取数据之前就拿到**，别让「有没有地址」
-取决于「有没有下载过」。内置游戏的清单在构建时就扫过 ROM 字节、把哈希写进
-`games.json`（见下一节），列表直接读现成的 `game.hash`，一次网络请求都不用发。
+取决于「有没有下载过」。内置游戏的哈希事先算好写在清单
+`games.json` 里（见下一节），列表直接读现成的 `game.hash`，一次网络请求都不用发。
 判别式测试：刷新页面、一次游戏都不进，能不能看见并读出自己的存档。
 
 
@@ -724,23 +711,6 @@ jsnes 1.2.1 的 `toJSON()` 只写 `romData/cpu/mmap/ppu`（unpkg jsnes@1.2.1/src
 免得导航失败伪装成功能失败。顺带一句：测试里手写 `indexedDB.open(名字, 版本)` 造数据的地方，
 应用升版本号（这次 1 → 2 加 `roms` 表）时也要跟着改 —— 用低于实际的版本 open 会直接
 `VersionError`，而 promise 里的 `onerror → resolve(false)` 会把它吞成「造数据失败」。
-
-
-## 改了 src 没重新构建，浏览器测试跑出「改了不生效」的假象
-
-**现象**：给失败提示换了说法，跑 `verify-*.cjs` 断言新文案，连续几次都是旧句子；
-一度怀疑代码路径没走到，甚至怀疑站点起错了目录。
-
-**原因**：所有浏览器脚本访问的是 `http://localhost:7890/nes-console/`，
-也就是 `dist/` 里的**构建产物**，不是 `src/`。Astro 只在 `npm run build` 时才重新打包
-`src/lib/*.js`，源码改了产物不会自己变。
-纯逻辑测试（`test-*-core.cjs`）直接 import `src/`，所以同一时间它们能过、浏览器测试不过 ——
-这个"一半绿一半红"的组合就是没重建的信号。
-
-**做法**：改完 `src/` 里的客户端代码，**跑浏览器脚本之前先 `npm run build`**，
-再看结果。判断站点是不是新的，最省事的一条是比对文件时间：
-`find src -name '*.js' -newer dist/_astro/<入口>.js`，有输出就是没重建。
-
 
 
 ## 验证脚本自己被 `addInitScript` 盖掉，测出「设置没生效」的假象
@@ -888,17 +858,18 @@ X/Y（键盘默认 C/V）。NES 原生手柄只有 A/B 两个动作位，一个�
 一个目录里有什么。之前的内置游戏是写死在源码里的数组（`BUILT_IN_GAMES`），
 「文件夹里有什么」这个信息从来没进过运行时，所以往文件夹里放文件不可能生效。
 
-**做法**：**目录内容属于构建期，不属于运行期**。加一个构建步骤扫描目录、
-生成清单（`public/games.json`），运行时 fetch 清单再按 URL 取文件 ——
-这正是 Astro Content Collections、Jekyll `_data` 的做法。两个细节：
+**做法**：**「有哪些文件」必须事先写成一份清单**，运行时 fetch 清单再按 URL 取文件。
+清单可以构建时扫目录生成（Astro Content Collections、Jekyll `_data` 的做法），
+也可以手写入库 —— 本项目去掉构建之后就是手写的 `web/games.json`，因为内置游戏只有一款、基本不再加。
 清单条目用**内容哈希**当 id（不是文件名），于是同一款 ROM 换个文件名不会分裂成
 两条、用户又加载了一份内置游戏也不会重复列出，列存档时还不用把 ROM 下载一遍；
-挂到构建系统的钩子（集成的 `astro:config:setup`）而不是 npm 的 `prebuild` 脚本，
-因为 CI 可能直接调用 `npx astro build`，绕过 npm script 就等于白做。
-判别式测试：往目录里复制一份 ROM，重新构建，列表多一行；复制同内容换个名，不多行。
+手写清单时哈希要用运行时同一个函数算（`storage.js` 的 `computeROMHash`），并有测试核对清单与磁盘一致
+（`verify-rom-catalog`），否则手改漏一处就悄悄对不上。
 
 
 ## 把长时间构建接进 head，dist 被清空后构建就再没跑完
+
+> 记录于还用 Astro 构建的时期（项目已去掉构建，没有 `dist/` 了）。留着是因为规则可迁移：任何会先清空输出目录的长命令都一样。
 
 **现象**：一批 Playwright 脚本同时报 404、找不到页面元素，看起来像代码全被改坏了。
 实际是 `dist/` 只剩一半。
@@ -951,7 +922,7 @@ X/Y（键盘默认 C/V）。NES 原生手柄只有 A/B 两个动作位，一个�
 `FS` 不在名单里，JS 侧就完全拿不到；而名单里的名字还会随版本删（`callFunction` 在
 emscripten 6.0.11 已经不存在）。
 
-**做法**：给浏览器/Astro 用的核心一律 `-s EXPORT_ES6=1` 输出 `.mjs`（顺带用
+**做法**：给浏览器用的核心一律 `-s EXPORT_ES6=1` 输出 `.mjs`（顺带用
 `new URL('….wasm', import.meta.url)` 定位 wasm，打包器能当资源处理）。需要堆分配就
 显式导出 `_malloc`/`_free`，需要虚拟文件系统就导出 `FS`。**方法名合法性不要猜**：
 拿一个三行的空 C 文件，把每个名字单独链接一次（秒级），比拿全量核心试错快两个数量级。
@@ -1154,7 +1125,7 @@ rAF 被节流而 AudioWorklet 照常消费，队列必然被抽干，报出来�
 「`host.frames > 30`」立刻为真，根本没等核心重新跑起来。
 
 **原因**：两个被等的量都是**不会随退出归零的累计值**。
-- `host.frames` 挂在宿主对象上，宿主整个页面只有一个（`src/lib/nes/console.js` 建一次），
+- `host.frames` 挂在宿主对象上，宿主整个页面只有一个（`web/js/nes/console.js` 建一次），
   退出到主菜单只 `stop()` 停帧，不清计数。
 - `host.audioStats.written` 是 AudioWorklet 每次 `port.postMessage` 报回来的**最近一次快照**，
   整个对象被替换（`libretro-host.js` 里 `this.audioStats = e.data`）。上下文关掉之后再没有新快照，
@@ -1173,7 +1144,7 @@ rAF 被节流而 AudioWorklet 照常消费，队列必然被抽干，报出来�
 ## 探针页面 import 了宿主的一份副本，产品改而副本不改，探针就一直在测旧代码
 
 **现象**：清理仓库时才发现 `agent-workspace/probe/libretro-host.js` 和产品的
-`src/lib/nes/libretro-host.js` 已经差 134 行 —— 音频队列目标 1024 vs 产品的 2048，
+`web/js/nes/libretro-host.js` 已经差 134 行 —— 音频队列目标 1024 vs 产品的 2048，
 存档方法叫 `getState/loadState` 而产品是 `serialize/unserialize`。
 而 `verify-host-browser.cjs`、`audio-drift.cjs` 跑的就是这份副本：换内核那轮真正修掉的
 问题（谎报 `GET_INPUT_BITMASKS` 导致按键进不去、音频目标帧数从 1024 提到 2048），
@@ -1183,9 +1154,9 @@ rAF 被节流而 AudioWorklet 照常消费，队列必然被抽干，报出来�
 机制要求它跟着产品走。测试又是绿的，分叉就看不见 —— 副本跑通的那一刻起，它测的就只是自己。
 
 **做法**：探针/原型工具**不存被测代码的副本**，直接发产品那份文件。需要不同的 URL 前缀就在
-自己的静态服务里加一条路由（`host-probe-server.cjs` 把 `/nes/` 挂到 `src/lib/nes/`）；
+自己的静态服务里加一条路由（`host-probe-server.cjs` 把 `/nes/` 挂到 `web/js/nes/`）；
 宿主里 worklet 是 `new URL('./audio-processor.js', import.meta.url)` 相对自己取的，
-所以要整个目录一起发，不能只发一个文件。被测二进制同理，只留 `public/cores/` 那一份。
+所以要整个目录一起发，不能只发一个文件。被测二进制同理，只留 `web/cores/` 那一份。
 自检判据：**同一个文件在仓库里出现两份、且两份都能跑，那其中一份一定在撒谎。**
 
 ## 拿画面「宽」当画面「高」算余量，CSS 不报错，只是永远差一截
@@ -1268,7 +1239,7 @@ toast 只露出半句，剩下的被一行宽度裁掉了。
 它只对 iOS 的 Safari/WKWebView 有意义，而测试跑在无头 Chromium 里 —— 也就是说
 「用运行时 API 查」这条路上**永远查不出有没有写对**，而它是否生效又只能在真机上看到。
 
-**做法**：这类「只有别家内核认」的声明，断言改成**读构建产物的 CSS 文本**（`fetch` 站点上那个 `.css`
+**做法**：这类「只有别家内核认」的声明，断言改成**读站点 CSS 文件的文本**（`fetch` 站点上那个 `.css`
 再正则匹配 `-webkit-touch-callout:\s*none`），而不是读计算样式；同时把「在 Chromium 上真起作用」的那部分
 （这里是 `contextmenu` 拦截、`user-select`）单独断言，两条合起来才覆盖三端。
 判据：**私有前缀属性的验证要看它落在哪一层** —— 被丢弃的只能验源码文本，被实现的才有运行时可查。
@@ -1466,3 +1437,21 @@ SVG 的 `stroke-width` 不取整（照小数画），所以尺子越大、两边
 **做法**：等异步启动一律用**推进量门槛**（核心帧计数比按下前多 30 帧），不用固定毫秒、也不用
 「界面回到游戏态」这类会被提前清掉的中间状态；同时把「菜单开着」这类断言收紧到**开的是哪份菜单**
 （快速菜单里必须有「继续游戏」），只判条目数 > 0 的话开错菜单也能绿。
+
+
+## 去掉构建（Astro + Tailwind）时，两处「看不见的依赖」会让页面悄悄变样或白屏
+
+**现象**：把 `.astro` 改成纯 `index.html`、`@tailwind` 指令换成手写 CSS 之后，最容易出的两种事：
+一是页面能打开但处处差几个像素（按钮多出边框和内边距、段落多出外边距、canvas 底下多一条缝）；
+二是核心或清单 404，控制台报 `import.meta.env is undefined`。
+
+**原因**：`@tailwind base` 不只是「给工具类用的」，它注入了一整份全局重置（Preflight：`box-sizing: border-box`、
+按钮去默认样式、`p`/`h*` 去外边距、`canvas`/`svg` 变块级……），页面所有手写样式都默认站在它上面；
+只抄用到的工具类、不带 Preflight，整页观感就变了。`import.meta.env.BASE_URL` 是 Vite（Astro 底层）
+在打包时替换进去的常量，浏览器原生模块里 `import.meta` 只有 `url`，没有 `env`。
+
+**做法**：迁出 Tailwind 时把 Preflight **原文**留成单独的 `reset.css`（当第三方代码，不在里面改），
+工具类只抄实际用到的；验收用改前改后同视口逐像素对比截图（这次 15 张 0 像素差异）。
+资源地址一律用相对当前模块的 `new URL('../cores/x.mjs', import.meta.url)`，不依赖任何构建期常量，
+站点放根目录还是子目录都对。
+

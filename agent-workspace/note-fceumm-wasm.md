@@ -1,7 +1,7 @@
 # fceumm wasm：已验证事实与浏览器宿主待办
 
 跑法与产物
-- 编译：`npm run build:core`（`scripts/build-core.cjs`）→ `public/cores/fceumm_libretro.{mjs,wasm}`（唯一一份产物，产品与原型工具都加载它）
+- 编译：`npm run build:core`（`scripts/build-core.cjs`）→ `web/cores/fceumm_libretro.{mjs,wasm}`（唯一一份产物，产品与原型工具都加载它）
 - ABI 冒烟：`node agent-workspace/smoke-fceumm-host.cjs [ROM 名前缀]` → 控制台指标 + `out/frame-<名>-300.png`
 - 源码：`third_party/libretro-fceumm/src`（含 `Makefile.common` / `Makefile.libretro` / `libretro-common`）
 - 工具链：emsdk 6.0.11，见 `agent-workspace/env-emsdk.md`
@@ -26,9 +26,9 @@
 ## 浏览器宿主实测（原型，2026-10-05）
 
 文件：页面 `probe/fceumm-host.html` + 静态服务 `host-probe-server.cjs`（7892/7893）。
-宿主、worklet、核心**都不另存副本**：页面 import 产品那份 `src/lib/nes/libretro-host.js`
-（worklet 由它按 `import.meta.url` 相对取 `src/lib/nes/audio-processor.js`），
-二进制取 `public/cores/fceumm_libretro.mjs`。所以这套探针测的就是出厂那份代码。
+宿主、worklet、核心**都不另存副本**：页面 import 产品那份 `web/js/nes/libretro-host.js`
+（worklet 由它按 `import.meta.url` 相对取 `web/js/nes/audio-processor.js`），
+二进制取 `web/cores/fceumm_libretro.mjs`。所以这套探针测的就是出厂那份代码。
 跑法：`node agent-workspace/verify-host-browser.cjs [ROM 名]`（四项判据全过才算）、
 `node agent-workspace/audio-drift.cjs [秒数]`（看音频队列深度趋势）。
 
@@ -89,10 +89,10 @@
 ## 已落地（2026-10-05 进产品，任务 #47~#51 完成）
 
 上面那五条差异全部按现状实现，代码在这里：
-`src/lib/nes/libretro-host.js`（宿主）· `audio-processor.js`（AudioWorklet 出口）·
+`web/js/nes/libretro-host.js`（宿主）· `audio-processor.js`（AudioWorklet 出口）·
 `rastate.js`（RASTATE 容器）· `console.js`（对 `app.js` 暴露的面）·
 `storage.js` v3（二进制槽位 + SAVE_RAM 镜像 + ROM 落盘）·
-`scripts/build-core.cjs`（正式构建步骤，产物进 `public/cores/`，wasm 随仓库走，CI 不需要 emsdk）。
+`scripts/build-core.cjs`（正式构建步骤，产物进 `web/cores/`，wasm 随仓库走，CI 不需要 emsdk）。
 
 原来的两条「未决」都已经有答案：
 - 核心构建**已**提升为正式步骤（`npm run build:core`），不再只出到 agent-workspace。
