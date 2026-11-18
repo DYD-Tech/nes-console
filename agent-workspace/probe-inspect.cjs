@@ -1,5 +1,5 @@
 /**
- * 读 public/rom/ 每款 ROM 的 iNES 头（mapper = (b6>>4)|((b7>>4)<<4)），
+ * 读 web/rom/ 每款 ROM 的 iNES 头（mapper = (b6>>4)|((b7>>4)<<4)），
  * 顺带看探针产出的截图是不是纯色 —— 坏头用例要分清「fceumm 没纠正」和「纠正了但跑歪了」。
  */
 const fs = require('fs');
@@ -9,8 +9,8 @@ const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'agent-workspace/probe/out');
 
 console.log('ROM 头：');
-for (const f of fs.readdirSync(path.join(ROOT, 'public/rom'))) {
-  const b = fs.readFileSync(path.join(ROOT, 'public/rom', f));
+for (const f of fs.readdirSync(path.join(ROOT, 'web/rom'))) {
+  const b = fs.readFileSync(path.join(ROOT, 'web/rom', f));
   const mapper = (b[6] >> 4) | ((b[7] >> 4) << 4);
   const prg = b[4] * 16384;
   const chr = b[5] * 8192;

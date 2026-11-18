@@ -1,14 +1,16 @@
----
-import '../styles/global.css';
----
-
 <!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>NES Console - 在线玩 NES 游戏</title>
-    <link rel="icon" type="image/svg+xml" href="/nes-console/favicon.svg" />
+    <!--
+      全部用相对路径：站点挂在根目录（python -m http.server）还是子目录
+      （GitHub Pages 的 /nes-console/）都能找到资源，不用改任何配置。
+    -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="css/reset.css" />
+    <link rel="stylesheet" href="css/global.css" />
   </head>
   <body>
     <!--
@@ -184,8 +186,7 @@ import '../styles/global.css';
       </div>
     </div>
 
-    <script>
-      import '../lib/app.js';
-    </script>
+    <!-- 入口：浏览器原生 ES 模块，app.js 再按 import 把其余模块拉进来，不打包 -->
+    <script type="module" src="js/app.js"></script>
   </body>
 </html>

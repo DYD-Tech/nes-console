@@ -125,7 +125,7 @@ export class LibretroHost {
   /** 加载并初始化核心：注册六个回调 + 环境回调 */
   async init() {
     if (this.m) return;
-    const { default: createCore } = await import(/* @vite-ignore */ this.coreUrl);
+    const { default: createCore } = await import(this.coreUrl);
     const m = await createCore();
     this.m = m;
 

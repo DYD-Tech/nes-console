@@ -72,7 +72,7 @@ const URL = 'http://localhost:7890/nes-console/';
       .findIndex((el) => el.classList.contains('selected'));
     const cat = () => ui.querySelector('.sys-nav-item.selected .sys-nav-label')?.textContent || '';
     await window.__press('ArrowLeft');
-    // 「游戏」分类有多少款取决于 public/rom/ 里放了什么，
+    // 「游戏」分类有多少款取决于 web/rom/ 里放了什么，
     // 所以光标移动在「游戏管理」这种条目固定的分类上验证（3 项）。
     for (let i = 0; i < 6 && cat() !== '游戏管理'; i++) await window.__press('ArrowDown');
     const reached = cat();

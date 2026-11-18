@@ -133,7 +133,7 @@ async function clickItem(page, label) {
       bladeFill: getComputedStyle(document.querySelector('.dpad-blade')).fill,
       bladeLine: getComputedStyle(document.querySelector('.dpad-blade')).stroke,
       bladeStrokeUnits: parseFloat(getComputedStyle(document.querySelector('.dpad-blade')).strokeWidth),
-      // 取景框边长（故意不是整块 100，见 index.astro）：描边折算成 px 要按它换算
+      // 取景框边长（故意不是整块 100，见 index.html）：描边折算成 px 要按它换算
       faceBox: document.querySelector('.touch-dpad-face').viewBox.baseVal.width,
       // 拨片的 getBoundingClientRect 只有路径、不含描边，所以「画出来的顶边」还要再减半个描边
       bladeTop: document.querySelector('.dpad-blade-up').getBoundingClientRect().top,

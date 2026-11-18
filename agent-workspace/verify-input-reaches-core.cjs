@@ -10,7 +10,7 @@
  * 这个脚本量的就是「核心查了哪些 (端口,id)、拿回了什么值」：把 host._inputState 包一层
  * 记账，再精确跑若干帧看账本。暂停后用 step 跑帧，账本里就只有这几帧，不会被 rAF 插进来。
  *
- * 跑法：先 `npm run build && npx astro preview --port 7890`，
+ * 跑法：先 `npm run serve`（把 web/ 挂到 7890），
  *      再 `node agent-workspace/verify-input-reaches-core.cjs [ROM 名关键字]`
  */
 const { launch } = require('./lib-browser.cjs');

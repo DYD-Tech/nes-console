@@ -3,7 +3,7 @@
  * 焦点模型的两形态（框在分类栏 / 框在列表行）只有截图能判断好不好看，
  * 断言只能证明属性值对，证明不了「两个框抢视线」这类问题。
  *
- * 跑法：先 npm run build 并把站点起在 7890，再 node agent-workspace/shot-menu-focus.cjs
+ * 跑法：先 npm run serve 把站点起在 7890，再 node agent-workspace/shot-menu-focus.cjs
  */
 const fs = require('fs');
 const path = require('path');

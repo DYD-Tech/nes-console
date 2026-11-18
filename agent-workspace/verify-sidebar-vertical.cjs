@@ -9,7 +9,7 @@
  * 自己的盒比，`.sys-body` 用 flex-wrap 换行时整栏被内容撑到 527px 高、超出 226px 的框
  * 被 `.screen` 裁掉一半，脚本却全绿 —— 溢出但没被裁的元素，它自己的盒就是假的。
  *
- * 跑法：先 npm run build 并把站点起在 7890，再 node agent-workspace/verify-sidebar-vertical.cjs
+ * 跑法：先 npm run serve 把站点起在 7890，再 node agent-workspace/verify-sidebar-vertical.cjs
  */
 const { launch } = require('./lib-browser.cjs');
 const { startGame } = require('./lib-game-menu.cjs');

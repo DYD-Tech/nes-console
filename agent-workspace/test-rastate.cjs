@@ -1,5 +1,5 @@
 /**
- * 快档测试：src/lib/nes/rastate.js（即时存档容器的读写）
+ * 快档测试：web/js/nes/rastate.js（即时存档容器的读写）
  *
  * 纯逻辑模块，一个浏览器 API 都不碰，所以不需要替身、不需要构建、不需要起站点。
  * 格式对标 RetroArch 的 tasks/task_save.c（见 rastate.js 头部注释），
@@ -17,7 +17,7 @@ function check(name, cond, detail = '') {
   else { fail++; console.log(`  ❌ ${name} ${detail}`); }
 }
 
-const MOD = path.join(__dirname, '..', 'src', 'lib', 'nes', 'rastate.js');
+const MOD = path.join(__dirname, '..', 'web', 'js', 'nes', 'rastate.js');
 
 (async () => {
   const { wrapRASTATE, unwrapRASTATE } = await import(pathToFileURL(fs.realpathSync(MOD)).href);

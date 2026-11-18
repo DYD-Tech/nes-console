@@ -1,3 +1,7 @@
+# 推到 main 自动发布到 GitHub Pages。
+#
+# 站点不需要构建：web/ 目录就是网站本身，原样上传即可，不装 Node、不跑 npm。
+# 写法对标 GitHub 官方的 Pages 静态站点模板（actions/starter-workflows 的 pages/static.yml）。
 name: Deploy to GitHub Pages
 
 on:
@@ -15,20 +19,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build
-        run: npx astro build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -36,15 +33,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: web
 
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

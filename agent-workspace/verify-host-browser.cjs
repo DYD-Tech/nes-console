@@ -17,7 +17,7 @@ const PORT = 7892;
 const BASE = `http://localhost:${PORT}`;
 
 const CASES = [
-  // 兼容矩阵 = `public/rom/` 里现在有的三款。各板卡的实测结论（含跑不到的款）记在
+  // 兼容矩阵 = `web/rom/` 里现在有的三款。各板卡的实测结论（含跑不到的款）记在
   // agent-workspace/note-fceumm-wasm.md，别往矩阵里加镜像里没有的款。
   { file: '金庸群侠传.nes', expectSram: 8192, note: 'mapper 163，jsnes 打不开' },
   { file: '重装机兵.nes', expectSram: 8192, note: 'mapper 74，jsnes 打不开' },
@@ -133,7 +133,7 @@ async function runCase(browser, file) {
   server.close();
   fs.writeFileSync(path.join(OUT_DIR, 'host-summary.json'), JSON.stringify(results, null, 2));
   console.log(`\n明细与截图在 ${OUT_DIR}`);
-  // 音频判据（worklet 侧回报，见 src/lib/nes/audio-processor.js）：
+  // 音频判据（worklet 侧回报，见 web/js/nes/audio-processor.js）：
   //  - sent：核心确实在吐样本，且主线程真的发了出去；
   //  - dropped：环装满过 —— 说明产出快于消费，延迟会一路涨，一次都不该有；
   //  - underrun：环被取干过（补了静音）。开局和每次恢复后都会有一次约一帧
