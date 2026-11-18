@@ -9,7 +9,7 @@
  *  3. 即时存档是不是合法的 RASTATE 容器（这是跟 RetroArch 桌面端互通的前提）。
  *  4. 电池存档（SRAM）能不能在退出游戏时落进 IndexedDB。
  *
- * 跑法：先 `npm run build && npx astro preview --port 7890`，
+ * 跑法：先 `npm run serve`（把 web/ 挂到 7890），
  *      再 `node agent-workspace/verify-wasm-core.cjs [ROM 名关键字]`
  */
 const { launch } = require('./lib-browser.cjs');
@@ -18,7 +18,7 @@ const { selectGameRow } = require('./lib-game-menu.cjs');
 const URL = 'http://localhost:7890/nes-console/';
 
 /**
- * 兼容矩阵 = `public/rom/` 里现在有的卡带，一款一格：矩阵的职责是「核心能不能跑这块板卡」，
+ * 兼容矩阵 = `web/rom/` 里现在有的卡带，一款一格：矩阵的职责是「核心能不能跑这块板卡」，
  * 所以只放镜像里真拿得到的款；各板卡的实测结论（帧数、SRAM、画面）记在
  * `agent-workspace/note-fceumm-wasm.md` 的探针表里，卡带下架了结论还在。
  *
@@ -134,7 +134,7 @@ async function runCase(browser, c) {
     // （以前这里返回半个结果对象，汇总段读 r.sramStore.length 直接抛异常，整套没跑完）。
     if (!found) {
       r.missing = true;
-      r.failAt = '清单里没有这款卡带（public/rom/ 缺文件）';
+      r.failAt = '清单里没有这款卡带（web/rom/ 缺文件）';
       return r;
     }
 

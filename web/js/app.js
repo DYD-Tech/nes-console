@@ -37,7 +37,12 @@ const fileInput = document.getElementById('file-input');
 const stageEl = document.querySelector('.stage');
 const layoutEditorEl = document.getElementById('layout-editor');
 
-const BASE = import.meta.env.BASE_URL;
+/**
+ * 站点根目录（web/）的绝对地址，清单 games.json 和内置 ROM 都相对它取。
+ * 按本文件自己的地址推（web/js/app.js 的上一级），不写死 /nes-console/：
+ * 站点挂在根目录还是子目录都对。
+ */
+const BASE = new URL('../', import.meta.url).href;
 
 /** 关于菜单里「Powered by fceumm」的落地页（libretro 核心的仓库） */
 const FCEUMM_URL = 'https://github.com/libretro/libretro-fceumm';
@@ -131,7 +136,7 @@ bindTouchControls();
 
 requestPersistence();
 
-// 把游戏列表读全：构建时生成的内置游戏清单 + 上次加入本机库的用户 ROM。
+// 把游戏列表读全：内置游戏清单（web/games.json）+ 上次加入本机库的用户 ROM。
 // 上面已经把主菜单推上去了，所以读回完要重画一次，否则恢复出来的游戏看不见。
 Promise.all([
   games.loadBuiltIn().catch((e) => showError(e.message)),
@@ -1065,7 +1070,7 @@ async function buildManageSavesMenu() {
   const allGames = games.getGames();
   const gamesWithSaves = [];
   for (const game of allGames) {
-    // 清单里就带 hash（构建时算好的），所以没进过游戏也能直接查它的存档，
+    // 清单里就带 hash（事先算好写进 games.json 的），所以没进过游戏也能直接查它的存档，
     // 不用为了知道哈希把 ROM 下载一遍。
     const hash = game.hash;
     if (!hash) continue;

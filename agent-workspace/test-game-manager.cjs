@@ -1,9 +1,9 @@
 /**
- * 快档测试：src/lib/game-manager.js（游戏列表：内置清单 + 本机 ROM + 当前运行）
+ * 快档测试：web/js/game-manager.js（游戏列表：内置清单 + 本机 ROM + 当前运行）
  *
  * 这个模块只碰两个浏览器 API：fetch（取清单、下载 ROM）和 IndexedDB
  * （通过 storage.js 落盘 ROM 与存档），所以两个都用最小替身补上就够了 ——
- * 不用起站点，也不用先 npm run build。
+ * 不用起站点。
  *
  * IndexedDB 替身按被测代码实际用到的那几件事实现：
  * open(name, version) 触发 onupgradeneeded、objectStore 的 put/get/getAll/delete、
@@ -131,7 +131,7 @@ global.fetch = async (url) => {
   };
 };
 
-const MOD = path.join(__dirname, '..', 'src', 'lib', 'game-manager.js');
+const MOD = path.join(__dirname, '..', 'web', 'js', 'game-manager.js');
 const bytes = (...a) => Uint8Array.from(a);
 const text = (s) => new TextEncoder().encode(s);
 
@@ -285,7 +285,7 @@ const text = (s) => new TextEncoder().encode(s);
     const added = await gm.addUserROM(rom, '超级玛丽.nes');
     check('加入后 id 用内容哈希（FNV-1a 32，与公开测试向量一致）',
       added.id === 'e40c292c_1', `实得 ${added.id}`);
-    check('哈希算法与构建清单用的是同一个函数',
+    check('哈希算法与 games.json 里预先算好的 id 用的是同一个函数',
       added.id === storage.computeROMHash(rom));
     check('显示名去掉 .nes 后缀', added.name === '超级玛丽', `实得 ${added.name}`);
     check('大写 .NES 后缀也去掉', (await gm.addUserROM(bytes(5, 5, 5, 5), 'B.NES')).name === 'B');

@@ -16,8 +16,11 @@ import { wrapRASTATE, unwrapRASTATE } from './rastate.js';
 export const SCREEN_WIDTH = 256;
 export const SCREEN_HEIGHT = 240;
 
-/** 核心产物由 scripts/build-core.cjs 编到 public/cores/，Astro 原样拷贝，不参与打包 */
-const CORE_URL = () => `${import.meta.env.BASE_URL}cores/fceumm_libretro.mjs`;
+/**
+ * 核心产物由 scripts/build-core.cjs 编到 web/cores/。
+ * 地址按本文件的位置推（web/js/nes/ → web/cores/），站点挂在哪个路径下都对。
+ */
+const CORE_URL = () => new URL('../../cores/fceumm_libretro.mjs', import.meta.url).href;
 
 export class NesConsole {
   /**

@@ -80,12 +80,12 @@ const load = (p) => import(pathToFileURL(path.join(ROOT, p)).href);
 
 (async () => {
   const { InputManager, ACTIONS, GAMEPAD_MAP, DEFAULT_BINDINGS, buildKeyMap, formatKeyCode } =
-    await load('src/lib/input-manager.js');
+    await load('web/js/input-manager.js');
   const { SettingsManager, DEFAULT_SETTINGS, SETTINGS_SCHEMA, PAD_MODES, PAD_GROUPS } =
-    await load('src/lib/settings-manager.js');
+    await load('web/js/settings-manager.js');
   // padLayout 的键名以 DRAG_UNITS 为准（两份常量迟早会对不上）
-  const { DRAG_UNITS } = await load('src/lib/touch-layout.js');
-  const { ScreenUI } = await load('src/lib/screen-ui.js');
+  const { DRAG_UNITS } = await load('web/js/touch-layout.js');
+  const { ScreenUI } = await load('web/js/screen-ui.js');
 
   // ==================== 输入系统 ====================
 

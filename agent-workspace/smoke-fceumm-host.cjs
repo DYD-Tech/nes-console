@@ -14,8 +14,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const CORE_MJS = path.join(ROOT, 'public/cores/fceumm_libretro.mjs');
-const ROM_DIR = path.join(ROOT, 'public/rom');
+const CORE_MJS = path.join(ROOT, 'web/cores/fceumm_libretro.mjs');
+const ROM_DIR = path.join(ROOT, 'web/rom');
 const OUT_DIR = path.join(__dirname, 'out');
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
@@ -46,9 +46,9 @@ const ENV = {
 async function main() {
   const arg = process.argv[2] || '热血格斗.nes';
   /**
-   * 参数两种给法：`public/rom/` 里的卡带名关键字（默认），或者一个显式路径。
+   * 参数两种给法：`web/rom/` 里的卡带名关键字（默认），或者一个显式路径。
    * 给路径是为了评估还没进镜像的卡带（比如挑随站发布的 homebrew）时，
-   * 不必往 `public/rom/` 里塞临时文件——那个目录是用户的卡带镜像。
+   * 不必往 `web/rom/` 里塞临时文件——那个目录是用户的卡带镜像。
    */
   const romPath = fs.existsSync(arg)
     ? path.resolve(arg)
@@ -227,12 +227,13 @@ async function main() {
 
 /**
  * 存一帧成 PNG，好让眼睛直接看过画面（数字对不等于画面对）。
- * sharp 是 Astro 的依赖，这里只当验证工具用，不进产品代码。
- * 核心给的是 XRGB8888 小端，内存里就是 B,G,R,X；sharp 的 raw 要 RGBA。
+ * 编码借用项目已有的 playwright：把像素画进无头浏览器的 canvas，再取 toDataURL 的 PNG ——
+ * 不为一张验证图另引图像库。只当验证工具用，不进产品代码。
+ * 核心给的是 XRGB8888 小端，内存里就是 B,G,R,X；canvas 的 ImageData 要 RGBA。
  */
 async function savePng(frame, file) {
   if (!frame) return;
-  const sharp = require('sharp');
+  const { launch } = require('./lib-browser.cjs');
   const { w, h, data } = frame;
   const rgba = Buffer.alloc(w * h * 4);
   for (let i = 0; i < w * h; i++) {
@@ -241,7 +242,23 @@ async function savePng(frame, file) {
     rgba[i * 4 + 2] = data[i * 4];
     rgba[i * 4 + 3] = 255;
   }
-  await sharp(rgba, { raw: { width: w, height: h, channels: 4 } }).png().toFile(file);
+  const browser = await launch();
+  try {
+    const page = await browser.newPage();
+    const dataUrl = await page.evaluate(({ w, h, b64 }) => {
+      const bin = atob(b64);
+      const px = new Uint8ClampedArray(bin.length);
+      for (let i = 0; i < bin.length; i++) px[i] = bin.charCodeAt(i);
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      c.getContext('2d').putImageData(new ImageData(px, w, h), 0, 0);
+      return c.toDataURL('image/png');
+    }, { w, h, b64: rgba.toString('base64') });
+    fs.writeFileSync(file, Buffer.from(dataUrl.split(',')[1], 'base64'));
+  } finally {
+    await browser.close();
+  }
   console.log(`  帧已存图：${file}`);
 }
 

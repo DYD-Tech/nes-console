@@ -1,8 +1,8 @@
 /**
- * 宿主原型的静态服务：把 probe/ 页面、产品那份核心、产品宿主模块本身、public/rom 的
+ * 宿主原型的静态服务：把 probe/ 页面、产品那份核心、产品宿主模块本身、web/rom 的
  * ROM 挂到同一个端口上。verify-host-browser.cjs 和 audio-drift.cjs 都要用，所以单独一个文件。
  *
- * 核心与宿主都直接发产品用的那份文件（`public/cores/`、`src/lib/nes/`）：原型工具测的
+ * 核心与宿主都直接发产品用的那份文件（`web/cores/`、`web/js/nes/`）：原型工具测的
  * 就是出厂的代码，不另存副本，免得副本和产品各自演化。`/nes/` 这个前缀不能省 ——
  * 宿主里 worklet 是按 `new URL('./audio-processor.js', import.meta.url)` 相对自己取的。
  *
@@ -13,10 +13,10 @@ const http = require('http');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const ROM_DIR = path.join(ROOT, 'public', 'rom');
+const ROM_DIR = path.join(ROOT, 'web', 'rom');
 const PROBE_DIR = path.join(__dirname, 'probe');
-const CORE_DIR = path.join(ROOT, 'public', 'cores');
-const NES_DIR = path.join(ROOT, 'src', 'lib', 'nes');
+const CORE_DIR = path.join(ROOT, 'web', 'cores');
+const NES_DIR = path.join(ROOT, 'web', 'js', 'nes');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',

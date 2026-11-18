@@ -11,7 +11,7 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-/** 快档：不起浏览器、不读构建产物，改完纯逻辑就能立刻跑 */
+/** 快档：不起浏览器、不起站点，改完纯逻辑就能立刻跑 */
 const FAST = [
   'test-system-core.cjs',
   'test-rastate.cjs',

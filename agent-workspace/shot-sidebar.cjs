@@ -1,6 +1,6 @@
 /**
  * 看一眼一级分类栏在手机上是不是还竖着排、放不下时能不能上下推、有没有露出滚动条。
- * 跑法：node agent-workspace/shot-sidebar.cjs（要先 npm run build 且站点起在 7890）
+ * 跑法：node agent-workspace/shot-sidebar.cjs（先 npm run serve 把站点起在 7890）
  */
 const { launch } = require('./lib-browser.cjs');
 const path = require('path');

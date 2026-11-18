@@ -1,5 +1,5 @@
 // 自检截图：菜单底栏（左数量 / 右按键图例）+ 屏幕右上角两颗常驻按钮。
-// 用法：node agent-workspace/shot-bottom-bar.cjs  （先 npm run build，预览服务在 7890）
+// 用法：node agent-workspace/shot-bottom-bar.cjs  （先 npm run serve 把站点起在 7890）
 const { launch } = require('./lib-browser.cjs');
 
 const VIEWPORTS = [

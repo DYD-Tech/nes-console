@@ -1,5 +1,5 @@
 /**
- * 编译 fceumm libretro 核心 → public/cores/fceumm_libretro.{mjs,wasm}
+ * 编译 fceumm libretro 核心 → web/cores/fceumm_libretro.{mjs,wasm}
  *
  * 用法：npm run build:core
  * 前置：emsdk（默认取 ~/emsdk，也可用环境变量 EMSDK_DIR / EMSDK 指定）。
@@ -45,7 +45,7 @@ const ROOT = path.resolve(__dirname, '..');
 const CORE = path.join(ROOT, 'third_party/libretro-fceumm');
 const SRC = path.join(CORE, 'src');
 const COMM = path.join(SRC, 'drivers/libretro/libretro-common');
-const OUT_DIR = path.join(ROOT, 'public', 'cores');
+const OUT_DIR = path.join(ROOT, 'web', 'cores');
 const SOURCE_COMMIT = '7a542dab1e87679921962a9f056186eca425c0c2';
 const EMSDK = process.env.EMSDK_DIR || process.env.EMSDK || path.join(os.homedir(), 'emsdk');
 const EMCC = path.join(EMSDK, 'upstream/emscripten', process.platform === 'win32' ? 'emcc.exe' : 'emcc');
@@ -176,7 +176,7 @@ function build() {
     // ESM 输出：本项目 package.json 是 "type": "module"，而默认（CJS）胶水用的
     // `module.exports` 在 ESM 解析下不生效。另外 ESM 版用
     // `new URL('….wasm', import.meta.url)` 定位 wasm，胶水与 wasm 放在
-    // public/cores/ 同一目录下即可自寻址（走 base 前缀也不用改）。
+    // web/cores/ 同一目录下即可自寻址（走 base 前缀也不用改）。
     '-s', 'EXPORT_ES6=1',
     '-s', 'EXPORT_NAME=createFceummCore',
     '-s', 'ENVIRONMENT=web,worker,node',
@@ -214,8 +214,8 @@ function build() {
     defines: DEFINES,
     optimization: '-O2',
   }, null, 2) + '\n');
-  console.log(`\n产出：public/cores/fceumm_libretro.mjs (${(fs.statSync(glue).size / 1024).toFixed(0)} KB)`);
-  console.log(`      public/cores/fceumm_libretro.wasm (${(fs.statSync(wasm).size / 1024 / 1024).toFixed(2)} MB)`);
+  console.log(`\n产出：web/cores/fceumm_libretro.mjs (${(fs.statSync(glue).size / 1024).toFixed(0)} KB)`);
+  console.log(`      web/cores/fceumm_libretro.wasm (${(fs.statSync(wasm).size / 1024 / 1024).toFixed(2)} MB)`);
 }
 
 build();

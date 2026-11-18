@@ -245,7 +245,7 @@ const check = (label, ok, actual) => {
   await p2.goto(URL, { waitUntil: 'networkidle' });
   await p2.waitForTimeout(400);
   // 按名字把光标移到 Destiny 再启动。原来写的是「点列表第一项」，
-  // 而内置游戏是构建时扫 public/rom/ 得到的多款 —— 往目录里多丢一个文件，
+  // 而内置游戏来自清单 web/games.json，可能不止一款 —— 往目录里多丢一个文件，
   // 第一项就换了，甚至可能换成一款跑不起来的，这一节的红就查不清是谁的问题。
   check('基线：游戏能启动（Destiny）', await startGame(p2, 'Destiny'));
   // 宿主的按键集合就是「送进模拟器的按键」（元素是 `端口:按键号`），
@@ -295,8 +295,8 @@ const check = (label, ok, actual) => {
 
   console.log('\n【7. A/B 的左右位置，以及长按不该弹出系统菜单】');
   // -webkit-touch-callout 只在 WebKit（iOS Safari）有效：实测 Chromium 在解析阶段
-  // 就把它整条丢掉（构建出的样式表里没有这个属性，getComputedStyle 取回空串），
-  // 所以浏览器侧读不到值。改查「产出的 CSS 里有没有这条声明」——
+  // 就把它整条丢掉（样式表里写了这个属性，getComputedStyle 也取回空串），
+  // 所以浏览器侧读不到值。改查「站点 CSS 文件里有没有这条声明」——
   // 用户手机上生效的就是这份文件，读它的文本比读一个不支持它的浏览器的计算值更真。
   const cssText = await p2.evaluate(async () => {
     const links = [...document.querySelectorAll('link[rel=stylesheet]')].map((l) => l.href);

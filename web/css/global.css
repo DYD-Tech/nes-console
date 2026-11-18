@@ -1,6 +1,37 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/*
+ * 全站样式。页面先引 reset.css（基础重置），再引这份。
+ *
+ * 不经过任何构建：浏览器直接读这个文件，改完刷新即生效。
+ */
+
+/* ==================== 通用工具类 ==================== */
+
+/*
+ * index.html 里直接写在元素上的几个小工具类（只有画布、CRT 层、「未加载 ROM」提示层和
+ * 隐藏的文件选择框在用；JS 生成的界面全部用下面的语义类名，不用这些）。
+ *
+ * 类名和取值照搬 Tailwind CSS v3 的同名工具类（tailwindcss.com/docs 各类名词条），
+ * 以前这些由 Tailwind 构建时生成，现在手写在这里，所以 HTML 不用改、画面不变。
+ * 新界面请写语义类名，不要往这里加 —— 这一节只为这几处既有标记存在。
+ *
+ * 放在文件最前面、比后面的组件样式先声明：同等优先级时，组件样式能盖过工具类，
+ * 和以前 Tailwind 把工具类插在这份文件开头时的层叠顺序一致。
+ */
+.hidden { display: none; }
+.block { display: block; }
+.flex { display: flex; }
+.absolute { position: absolute; }
+.inset-0 { inset: 0px; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.pointer-events-none { pointer-events: none; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.text-center { text-align: center; }
+.text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.text-gray-300 { color: rgb(209 213 219); }
+.bg-black\/70 { background-color: rgb(0 0 0 / 0.7); }
 
 /* ==================== 屏幕外围主题 ==================== */
 
@@ -67,7 +98,7 @@
  * - touch-callout: 只对 iOS 有效，挡的就是那个"按住不放"弹出的系统气泡，
  *   取值 default / none，会往下继承，所以写在 html 上就够了
  *   （出处：MDN「-webkit-touch-callout」，标注为非标准属性，只有 WebKit 系实现 ——
- *   Chromium 在解析阶段就当非法声明丢掉，所以这条只能在构建出的 CSS 文本里验，见踩坑记录）。
+ *   Chromium 在解析阶段就当非法声明丢掉，所以这条只能在 CSS 源文本里验，见踩坑记录）。
  * - user-select: 选不中文字，长按就没有"复制"可给，Android 的菜单少一半触发点
  *   （出处：MDN「user-select」，Safari 需要 -webkit- 前缀）。
  * - contextmenu 事件：Android Chrome 长按直接派发这个事件，CSS 挡不住，
@@ -1164,7 +1195,7 @@ button.loading {
 
 /*
  * 四片拨片：外端扁弧接一段直边，再直直收成圆头尖，尖都指向中心，片之间的缝指向斜向。
- * 描边粗用 viewBox 单位，换算要看取景框：框边长 93.52（见 index.astro），格子 8.25u，
+ * 描边粗用 viewBox 单位，换算要看取景框：框边长 93.52（见 index.html），格子 8.25u，
  * 1 单位 = 8.25u/93.52 ≈ 0.0882u，所以 2.13 单位 ≈ 0.1875u —— 正是 --pad-line-w
  * 那个倍数。按钮那边把同一个倍数取整到整像素（浏览器本来就会把边框宽度向下取整），
  * 两边最多差半像素，手柄放大多少倍都不脱钩。

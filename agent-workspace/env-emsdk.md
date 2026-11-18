@@ -50,5 +50,5 @@ clang 能正常产出 wasm + JS glue，`--sysroot` 缓存已就位（首次运�
 ## 已经做完的
 
 - fceumm 核心的实际编译：不依赖上游 Makefile，用脚本 glob 源文件直接喂 `emcc`
-  （`scripts/build-core.cjs`，产物进 `public/cores/` 并随仓库走，CI 不需要 emsdk）。
+  （`scripts/build-core.cjs`，产物进 `web/cores/` 并随仓库走，CI 不需要 emsdk）。
   一次把几百个源文件交给 emcc 会被无声杀掉，得用响应文件（`.rsp`）—— 记在踩坑文档。

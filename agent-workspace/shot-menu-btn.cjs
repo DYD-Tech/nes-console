@@ -1,5 +1,5 @@
 // 屏幕内「菜单」按钮的样子：整屏 + 右上角放大，和手柄按键放一起对眼。
-// 用法：node agent-workspace/shot-menu-btn.cjs   （要先 npm run build 且预览服务在 7890）
+// 用法：node agent-workspace/shot-menu-btn.cjs   （先 npm run serve 把站点起在 7890）
 const { launch } = require('./lib-browser.cjs');
 
 const VIEWPORTS = [

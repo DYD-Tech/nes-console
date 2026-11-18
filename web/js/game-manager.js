@@ -18,17 +18,24 @@ import { computeROMHash, getSaveStates, deleteState, saveROM, listROMs, deleteRO
 
 /**
  * 内置游戏从哪来：
- * 把 .nes 文件丢进 `public/rom/`，构建时 `src/integrations/rom-catalog.js`
- * 扫这个目录生成 `public/games.json`，启动时 fetch 这份清单（见 loadBuiltIn）。
+ * `web/games.json` 是一份手写入库的清单，每款一条：
+ *   { id: ROM 内容哈希, name: 显示名, url: 相对 web/ 的地址, size: 字节数 }
+ * 对应的 .nes 放在 `web/rom/`。启动时 fetch 这份清单（见 loadBuiltIn）。
+ *
+ * 为什么是手写清单，而不是「目录里有什么就显示什么」：
+ * 浏览器只能按地址取文件，没法让静态服务器列出目录内容，前端自己数不出 rom/ 里有几款。
+ * 以前是构建时扫目录生成清单；项目改成不构建之后，内置游戏只有一款、基本不再增加，
+ * 手写一条最简单。站点的主要用法是玩家自己导入 ROM（存 IndexedDB，不需要清单）。
+ *
+ * 加一款内置游戏：.nes 放进 web/rom/，在 games.json 里加一条。
+ * id 必须是 storage.js 里 computeROMHash 对文件内容算出的值 —— 存档按它存，
+ * 和运行时算的不一致，存档就对不上。算法和命令见 doc/游戏库与存档.md。
  *
  * 为什么是「清单 + 按需 fetch」而不是启动时全下载：
  * ROM 一个就几百 KB 到 2 MB，全下载会拖慢首屏；而且玩家通常只玩其中一个。
  * 清单只有元数据（每款一行），点击时才去取实际文件。
  *
- * 浏览器不能列目录，所以清单必须构建时生成 —— 改完 ROM 目录要重新
- * `npm run dev` / `npm run build`（这个集成挂在两条命令的启动钩子上，都会刷新清单）。
- *
- * 版权：这个目录里的 ROM 会随 dist/ 一起发布。只有自制游戏、公有领域作品
+ * 版权：web/rom/ 里的 ROM 会随站点一起发布。只有自制游戏、公有领域作品或已获授权的
  * 才能放进来；商业游戏的 ROM 有版权，自己本地玩请走「游戏管理 → 加入游戏」
  * （存 IndexedDB，不进站点）。
  */
@@ -81,7 +88,7 @@ export class GameManager {
   }
 
   /**
-   * 读构建时生成的内置游戏清单（public/games.json），把内置游戏灌进列表。
+   * 读内置游戏清单（web/games.json，手写入库），把内置游戏灌进列表。
    *
    * 放在启动流程里调用一次。已经在本机 IndexedDB 里存过的同一份 ROM 不重复加，
    * 否则列表里会出现两行一样的游戏（一行「内置」、一行「已加载」）。
